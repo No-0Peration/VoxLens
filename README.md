@@ -13,6 +13,7 @@ Early and experimental. The repository currently holds project and agent configu
 ```
 /
 ├── README.md
+├── CONTEXT.md             ← the domain glossary
 ├── AGENTS.md              ← conventions for agents working in this repo
 └── docs/
     └── agents/
@@ -21,9 +22,10 @@ Early and experimental. The repository currently holds project and agent configu
         └── domain.md
 ```
 
-Two documents will appear at the root as the domain takes shape, created lazily rather than upfront:
+[`CONTEXT.md`](CONTEXT.md) fixes the project's vocabulary. Terms like _Clip_, _Occlusion_, and _Inferred Text_ mean something specific here — use them as defined rather than reaching for a synonym.
 
-- `CONTEXT.md` — the glossary and domain model. Terms like _frame_, _viseme_, _utterance_, and _speaker_ mean something specific here; this is where those definitions get pinned down.
+One directory will appear as the project grows, created lazily rather than upfront:
+
 - `docs/adr/` — architecture decision records, one file per decision.
 
 ## Working in this repo
