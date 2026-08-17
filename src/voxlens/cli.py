@@ -13,6 +13,7 @@ import time
 
 from voxlens.devices import DEFAULT_DEVICE, resolve_device
 from voxlens.extraction import MouthRegionError, extract_mouth_regions
+from voxlens.occlusion import DEFAULT_MIN_FRAMES, find_occlusions
 from voxlens.result import Result, Timing, checkpoint_identity
 from voxlens.video import UnreadableClipError, decode_clip
 
@@ -49,6 +50,15 @@ def build_parser() -> argparse.ArgumentParser:
         dest="as_json",
         help="emit machine-readable output on stdout; the evaluation harness "
         "consumes this, so nothing else may reach stdout",
+    )
+    parser.add_argument(
+        "--occlusion-min-frames",
+        type=int,
+        default=DEFAULT_MIN_FRAMES,
+        metavar="N",
+        help="consecutive Frames with no detected face before the gap counts "
+        "as an Occlusion rather than detector noise; 3 frames is 120ms, about "
+        "one viseme (default: %(default)s)",
     )
     parser.add_argument(
         "--beam",
@@ -96,6 +106,10 @@ def main(argv: list[str] | None = None) -> int:
     transcript = recogniser.transcribe(regions.crops)
     infer_s = time.perf_counter() - started
 
+    occlusions = find_occlusions(
+        regions.undetected, min_frames=args.occlusion_min_frames
+    )
+
     result = Result(
         video=args.video,
         frames=clip.frame_count,
@@ -106,6 +120,8 @@ def main(argv: list[str] | None = None) -> int:
         timing=Timing(extract_s=extract_s, infer_s=infer_s, duration_s=clip.duration_s),
         device=plan.name,
         beam=args.beam,
+        occlusion_min_frames=args.occlusion_min_frames,
+        occlusions=tuple(occlusions),
         checkpoint=checkpoint_identity(args.checkpoint),
     )
 
@@ -117,6 +133,8 @@ def main(argv: list[str] | None = None) -> int:
 
     # Diagnostics never touch stdout, in either mode: --json must stay pipeable.
     print(result.summary_line(), file=sys.stderr)
+    for line in result.occlusion_lines():
+        print(line, file=sys.stderr)
     return EXIT_OK
 
 

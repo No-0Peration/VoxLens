@@ -9,6 +9,8 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from pathlib import Path
 
+from voxlens.occlusion import OcclusionSpan
+
 __all__ = ["Result", "Timing", "checkpoint_identity"]
 
 
@@ -61,6 +63,8 @@ class Result:
     timing: Timing
     device: str
     beam: int
+    occlusion_min_frames: int
+    occlusions: tuple[OcclusionSpan, ...] = ()
     checkpoint: dict = field(default_factory=dict)
 
     def as_dict(self) -> dict:
@@ -71,10 +75,15 @@ class Result:
             "duration_s": round(self.duration_s, 2),
             "transcript": self.transcript,
             "undetected_frames": self.undetected_frames,
+            # Spans only, never per-word marking: the CTC head and beam search
+            # transcribe differently, so word positions cannot be trusted
+            # (ADR-0008).
+            "occlusions": [span.as_dict(self.fps) for span in self.occlusions],
             "timing": self.timing.as_dict(),
             "config": {
                 "device": self.device,
                 "beam": self.beam,
+                "occlusion_min_frames": self.occlusion_min_frames,
                 "checkpoint": self.checkpoint,
             },
         }
@@ -83,5 +92,25 @@ class Result:
         """The one-line diagnostic, for stderr in both output modes."""
         return (
             f"{self.frames} frames, {self.duration_s:.1f}s, RTF {self.timing.rtf:.2f}"
-            f"  |  {self.undetected_frames} frame(s) with no detected face"
+            f"  |  {len(self.occlusions)} occlusion(s), "
+            f"{self.undetected_frames} frame(s) with no detected face"
         )
+
+    def occlusion_lines(self) -> list[str]:
+        """Human-readable Occlusion report, for stderr.
+
+        Occlusions are NOT spliced into the Transcript on stdout. Placing them
+        within the text would require knowing which words they cover, and
+        ADR-0008 records why that cannot be done reliably. Reporting them
+        beside the Transcript is honest; guessing a position would not be.
+        """
+        if not self.occlusions:
+            return []
+        lines = ["mouth unreadable:"]
+        for span in self.occlusions:
+            data = span.as_dict(self.fps)
+            lines.append(
+                f"  {data['start_s']:6.2f}s - {data['end_s']:6.2f}s"
+                f"  ({data['duration_s']:.2f}s, frames {span.start_frame}-{span.end_frame})"
+            )
+        return lines

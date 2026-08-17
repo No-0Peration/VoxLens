@@ -160,3 +160,45 @@ def test_human_mode_still_prints_a_bare_transcript():
     plain = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT)
     payload = json.loads(run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json").stdout)
     assert plain.stdout.strip() == payload["transcript"]
+
+
+@needs_upstream
+@needs_face_clip
+def test_json_reports_occlusion_spans_with_frames_and_seconds():
+    payload = json.loads(run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json").stdout)
+    assert payload["occlusions"], "this fixture has undetected frames"
+    span = payload["occlusions"][0]
+    assert set(span) == {"start_frame", "end_frame", "start_s", "end_s", "duration_s"}
+    assert span["end_frame"] >= span["start_frame"]
+    assert span["duration_s"] > 0
+
+
+@needs_upstream
+@needs_face_clip
+def test_no_word_is_labelled_read_or_unreadable():
+    """ADR-0008: spans only. Per-word marking would need alignment we do not have."""
+    payload = json.loads(run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json").stdout)
+    assert "words" not in payload
+    assert "read" not in json.dumps(payload["occlusions"])
+
+
+@needs_upstream
+@needs_face_clip
+def test_raising_the_threshold_reports_fewer_occlusions():
+    def count(threshold: str) -> int:
+        out = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json",
+                      "--occlusion-min-frames", threshold).stdout
+        return len(json.loads(out)["occlusions"])
+
+    assert count("50") < count("3"), "a high threshold should suppress short gaps"
+
+
+@needs_upstream
+@needs_face_clip
+def test_the_transcript_on_stdout_stays_free_of_occlusion_markers():
+    """Occlusion is reported beside the Transcript, never spliced into it."""
+    plain = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT)
+    assert "unreadable" not in plain.stdout
+    assert "unreadable" in plain.stderr
+    payload = json.loads(run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json").stdout)
+    assert plain.stdout.strip() == payload["transcript"]
