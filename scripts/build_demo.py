@@ -72,6 +72,38 @@ def render_clip(clip: dict, note: str) -> str:
     )
 
 
+def swap_examples(picked: list[tuple[dict, str]], wanted: int = 2) -> str:
+    """Quote real substitutions from the clips actually shown.
+
+    Hand-written examples drift the moment clip selection changes, and prose
+    citing words the reader cannot see on the page reads as invented.
+    """
+    def looks_alike(said: str, read: str) -> bool:
+        """Approximate a viseme confusion: two real words of similar shape.
+
+        The point of the example is that the pair is hard to tell apart on a
+        mouth. A long word swapped for "a" is a length error and illustrates
+        nothing, so short words and big length gaps are filtered out.
+        """
+        return (
+            len(said) > 3 and len(read) > 3
+            and abs(len(said) - len(read)) <= 2
+            and said != read
+        )
+
+    seen: list[str] = []
+    for clip, _ in picked:
+        for tag, said, read in align(clip["reference"], clip["hypothesis"]):
+            if tag == "sub" and said and read and looks_alike(said, read):
+                pair = (f"<em>{html.escape(said.capitalize())}</em> becomes "
+                        f"<em>{html.escape(read)}</em>.")
+                if pair not in seen:
+                    seen.append(pair)
+            if len(seen) >= wanted:
+                return " ".join(seen)
+    return " ".join(seen) if seen else "Words that look alike get swapped."
+
+
 def pick_clips(clips: list[dict]) -> list[tuple[dict, str]]:
     scored = [c for c in clips if c["words"] >= MIN_WORDS]
     scored.sort(key=lambda c: c["errors"] / c["words"])
@@ -137,8 +169,10 @@ def main(argv: list[str] | None = None) -> int:
     clips, summary = data["clips"], data["summary"]
 
     bars, under_ten, over_hundred = render_distribution(clips)
+    picked = pick_clips(clips)
     values = {
-        "CLIPS": "\n  ".join(render_clip(c, note) for c, note in pick_clips(clips)),
+        "CLIPS": "\n  ".join(render_clip(c, note) for c, note in picked),
+        "SWAP_EXAMPLES": swap_examples(picked),
         "BARS": bars,
         "WER": str(summary["wer_pct"]),
         "PERFECT": str(sum(1 for c in clips if c["words"] and not c["errors"])),

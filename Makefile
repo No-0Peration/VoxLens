@@ -13,8 +13,9 @@ CORPUS     ?= $(VOXLENS_CORPUS)
 CLIP       ?= $(VOXLENS_TEST_CLIP)
 STRIDE     ?= 1
 PY         ?= .venv/bin/python
+CHROME     ?= /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 
-.PHONY: demo check-inputs
+.PHONY: demo demo-pdf check-inputs
 
 check-inputs:
 	@test -n "$(CHECKPOINT)" || { echo "set CHECKPOINT (or VOXLENS_CHECKPOINT)"; exit 2; }
@@ -26,3 +27,13 @@ demo: check-inputs
 	  --stride $(STRIDE) --out .demo-results.json
 	$(PY) -m voxlens.cli "$(CLIP)" --checkpoint "$(CHECKPOINT)" --json > .demo-occlusion.json
 	$(PY) scripts/build_demo.py --results .demo-results.json --occlusion .demo-occlusion.json
+	@$(MAKE) --no-print-directory demo-pdf
+
+# A print copy for people who will not clone the repo. Skipped rather than
+# failed where Chrome is absent — the HTML is the artifact, the PDF is a
+# convenience.
+demo-pdf:
+	@test -x "$(CHROME)" || { echo "demo-pdf: skipped, no Chrome at $(CHROME)"; exit 0; }
+	@"$(CHROME)" --headless --disable-gpu --no-pdf-header-footer \
+	  --print-to-pdf=docs/demo.pdf "file://$(CURDIR)/docs/demo.html" 2>/dev/null \
+	  && echo "wrote docs/demo.pdf"

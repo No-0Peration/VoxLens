@@ -27,8 +27,10 @@ Not built: real-time streaming (Clips only, per [ADR-0001](docs/adr/0001-clips-f
 ├── src/voxlens/
 ├── tests/
 └── docs/
-    ├── setup.md           ← start here
+    ├── setup.md           ← install
+    ├── usage.md            ← how to run it
     ├── demo.html           ← what the model reads, against what was said
+    ├── demo.pdf            ← the same page, for reading offline
     ├── architecture.md     ← system shape and module boundaries
     ├── adr/               ← architecture decision records
     ├── research/          ← primary-source findings behind the decisions
@@ -39,7 +41,9 @@ Not built: real-time streaming (Clips only, per [ADR-0001](docs/adr/0001-clips-f
 
 [`CONTEXT.md`](CONTEXT.md) fixes the project's vocabulary. Terms like _Clip_, _Occlusion_, and _Inferred Text_ mean something specific here — use them as defined rather than reaching for a synonym.
 
-[`docs/demo.html`](docs/demo.html) shows what VoxLens actually reads off a speaker's lips, word by word against what they said, over the full benchmark. Open it in a browser.
+[`docs/usage.md`](docs/usage.md) is the guide to running it — reading a video, understanding the output, scoring against a corpus.
+
+[`docs/demo.html`](docs/demo.html) shows what VoxLens actually reads off a speaker's lips, word by word against what they said, over the full benchmark. Open it in a browser, or read [`docs/demo.pdf`](docs/demo.pdf).
 
 [`docs/architecture.md`](docs/architecture.md) describes the pipeline, where each stage runs, and where the time actually goes.
 
@@ -71,5 +75,13 @@ uv run pytest
 ```
 
 A couple of skips are expected — those are the tests that need a checkpoint. VoxLens never downloads the ~4 GB checkpoint for you; supply it via `VOXLENS_CHECKPOINT`.
+
+Then read a video:
+
+```bash
+voxlens interview.mp4 --checkpoint "$VOXLENS_CHECKPOINT"
+```
+
+[`docs/usage.md`](docs/usage.md) covers the rest — JSON output, batch runs, exit codes, and scoring against a corpus.
 
 If you are on a Mac migrated from Intel hardware, read the last section of the setup doc before anything else. That failure mode produces no error message pointing at its cause.
