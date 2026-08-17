@@ -18,12 +18,21 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path(__file__).resolve().parents[1]
-VENDOR = ROOT / "vendor" / "usr2"
-PATCHES = ROOT / "patches"
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-REPO = "https://github.com/ahaliassos/usr2.git"
-REV = "df0c78b7a3807e625a0fcdadd14b1cf674d21c91"
+# Single source of truth. The pin and the vendored layout live in the package
+# so that bumping the revision is a one-file edit; duplicating them here once
+# meant the script and the code could disagree about what was vendored.
+from voxlens.upstream import (  # noqa: E402
+    UPSTREAM_REPO as REPO,
+    UPSTREAM_REV as REV,
+    is_vendored,
+    patches_dir,
+    vendored_path,
+)
+
+VENDOR = vendored_path()
+PATCHES = patches_dir()
 
 
 def run(cmd: list[str], cwd: Path | None = None) -> subprocess.CompletedProcess:
@@ -43,7 +52,7 @@ def patches() -> list[Path]:
 
 
 def check() -> int:
-    if not (VENDOR / "espnet").is_dir():
+    if not is_vendored():
         print("vendor: not vendored — run: uv run python scripts/vendor.py")
         return 1
     head = run(["git", "rev-parse", "HEAD"], cwd=VENDOR).stdout.strip()

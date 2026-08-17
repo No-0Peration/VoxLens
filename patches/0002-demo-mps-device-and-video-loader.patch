@@ -1,8 +1,8 @@
 diff --git a/demo.py b/demo.py
-index 2f598dd..8b26d3e 100644
+index 2f598dd..54b2161 100644
 --- a/demo.py
 +++ b/demo.py
-@@ -58,7 +58,27 @@ def load_video_audio(path: str, target_fps: int = 25, target_sr: int = 16000):
+@@ -58,7 +58,35 @@ def load_video_audio(path: str, target_fps: int = 25, target_sr: int = 16000):
      import os
      if not os.path.exists(path):
          raise FileNotFoundError(f"Video file not found: {path}")
@@ -23,15 +23,23 @@ index 2f598dd..8b26d3e 100644
 +        raise RuntimeError(f"No decodable video frames in: {path}")
 +    import numpy as _np
 +    video = torch.from_numpy(_np.stack(_frames))
++    # VoxLens is video-only, but upstream supports audio modes, so audio is
++    # still loaded. Probe first: a file with no audio stream is ordinary and
++    # yields silence, whereas a genuine decode failure must NOT be swallowed
++    # into zeros — a caller cannot tell that apart from real silence.
 +    try:
-+        audio, _sr = torchaudio.load(path)
++        _has_audio = torchaudio.info(path).num_frames > 0
 +    except Exception:
++        _has_audio = False
++    if _has_audio:
++        audio, _sr = torchaudio.load(path)      # decode errors propagate
++    else:
 +        audio, _sr = torch.zeros(1, 0), target_sr
 +    info = {"video_fps": _src_fps, "audio_fps": _sr}
      # video: (T, H, W, C) uint8   audio: (C, S) float
  
      # --- audio ---------------------------------------------------------------
-@@ -281,7 +301,14 @@ def main(cfg: DictConfig):
+@@ -281,7 +309,14 @@ def main(cfg: DictConfig):
  
      detector = cfg.get("detector", "mediapipe")
  

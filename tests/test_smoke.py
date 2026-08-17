@@ -5,6 +5,7 @@ checkpoint is ~4 GB, caller-supplied, and never downloaded automatically —
 so these tests skip with an actionable message when it is absent.
 """
 import os
+import platform
 
 import pytest
 import torch
@@ -23,10 +24,30 @@ needs_checkpoint = pytest.mark.skipif(
 )
 
 
-def test_mps_backend_is_present():
-    """Guards the migrated-Mac failure: an x86 toolchain has no working MPS."""
+@pytest.mark.skipif(platform.system() != "Darwin", reason="macOS-only guarantee")
+def test_the_interpreter_is_native_arm64():
+    """Guards the migrated-Mac failure, where an x86_64 Python arrives silently.
+
+    `docs/setup.md` tells the reader this test will catch a wrong interpreter,
+    so it has to check the thing that actually goes wrong: the architecture.
+    """
+    assert platform.machine() == "arm64", (
+        f"This interpreter is {platform.machine()}, not arm64. On a Mac migrated "
+        "from Intel hardware, python3 and uv are often still x86_64 builds and "
+        "torch ships no x86 macOS wheels above 2.4.1. See docs/setup.md."
+    )
+
+
+@pytest.mark.skipif(platform.system() != "Darwin", reason="macOS-only guarantee")
+def test_the_gpu_is_actually_usable():
+    """`is_built()` is a compile-time flag and passes on machines that cannot
+    run a single kernel. Availability is the property setup.md promises."""
     assert torch.backends.mps.is_built(), (
-        "PyTorch has no MPS support — this usually means an x86_64 Python. "
+        "PyTorch was built without MPS — almost certainly an x86_64 Python. "
+        "See docs/setup.md."
+    )
+    assert torch.backends.mps.is_available(), (
+        "PyTorch has MPS support but reports it unavailable on this machine. "
         "See docs/setup.md."
     )
 

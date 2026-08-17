@@ -14,12 +14,25 @@ import torch
 
 from voxlens.devices import DevicePlan
 
-__all__ = ["UPSTREAM_REPO", "UPSTREAM_REV", "is_vendored", "load_encoder", "vendored_path"]
+__all__ = [
+    "UPSTREAM_REPO",
+    "UPSTREAM_REV",
+    "is_vendored",
+    "load_encoder",
+    "patches_dir",
+    "vendored_path",
+]
 
+# The single source of truth for what gets vendored. scripts/vendor.py imports
+# these rather than restating them, so the pin cannot drift between the script
+# that fetches the tree and the code that loads it.
 UPSTREAM_REPO = "https://github.com/ahaliassos/usr2.git"
 UPSTREAM_REV = "df0c78b7a3807e625a0fcdadd14b1cf674d21c91"
 
 BACKBONE = "resnet_transformer_large"
+
+# Presence of this directory is what "vendored" means, in one place.
+_VENDOR_MARKER = "espnet"
 
 
 def repo_root() -> Path:
@@ -30,9 +43,12 @@ def vendored_path() -> Path:
     return repo_root() / "vendor" / "usr2"
 
 
+def patches_dir() -> Path:
+    return repo_root() / "patches"
+
+
 def is_vendored() -> bool:
-    path = vendored_path()
-    if not (path / "espnet").is_dir():
+    if not (vendored_path() / _VENDOR_MARKER).is_dir():
         return False
     _ensure_importable()
     return True
