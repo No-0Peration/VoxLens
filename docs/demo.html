@@ -1,0 +1,248 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Reading Lips</title>
+<!--
+  Generated from an evaluation run, not written by hand.
+
+    voxlens-eval <corpus> --corpus lrs3 --checkpoint <ckpt> --out results.json
+
+  Every figure here comes from that run: 1,321 clips, beam 1, hybrid device.
+  If the pipeline changes, this page is stale until it is regenerated — the
+  numbers are baked in, not computed at load.
+-->
+<style>
+:root{
+  --ground:#F2F5F5; --panel:#FFFFFF; --ink:#151B1E; --muted:#5F6E74;
+  --line:#D7DEDF; --said:#2F7568; --read:#A96E22; --invented:#A6443B;
+  --said-bg:#E2EFEB; --read-bg:#F6EBD9; --invented-bg:#F6E3E0;
+  --sans:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+  --mono:ui-monospace,SFMono-Regular,Menlo,Consolas,"Liberation Mono",monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#0F1416; --panel:#161D20; --ink:#E6ECEE; --muted:#8D9BA1;
+    --line:#263034; --said:#5FB3A1; --read:#D9A25A; --invented:#D27165;
+    --said-bg:#16302B; --read-bg:#332715; --invented-bg:#331E1B;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#0F1416; --panel:#161D20; --ink:#E6ECEE; --muted:#8D9BA1;
+  --line:#263034; --said:#5FB3A1; --read:#D9A25A; --invented:#D27165;
+  --said-bg:#16302B; --read-bg:#332715; --invented-bg:#331E1B;
+}
+*{box-sizing:border-box}
+body{margin:0;background:var(--ground);color:var(--ink);font-family:var(--sans);
+  font-size:17px;line-height:1.6;-webkit-font-smoothing:antialiased}
+.wrap{max-width:860px;margin:0 auto;padding:clamp(32px,6vw,72px) clamp(20px,5vw,32px) 96px;
+  display:flex;flex-direction:column;gap:56px}
+h1{font-size:clamp(34px,6vw,52px);line-height:1.05;letter-spacing:-.022em;margin:0;
+  font-weight:640;text-wrap:balance}
+h2{font-size:23px;letter-spacing:-.012em;margin:0 0 14px;font-weight:620;text-wrap:balance}
+p{margin:0 0 14px;max-width:66ch}
+p:last-child{margin-bottom:0}
+.lede{font-size:19px;color:var(--muted);max-width:60ch}
+.eyebrow{font-family:var(--mono);font-size:11.5px;letter-spacing:.16em;text-transform:uppercase;
+  color:var(--muted);margin:0 0 14px}
+section{display:flex;flex-direction:column}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1px;
+  background:var(--line);border:1px solid var(--line);border-radius:3px;overflow:hidden}
+.stat{background:var(--panel);padding:18px 20px}
+.stat .n{font-family:var(--mono);font-size:27px;font-variant-numeric:tabular-nums;
+  letter-spacing:-.02em;display:block;line-height:1.15}
+.stat .l{font-size:13px;color:var(--muted);display:block;margin-top:4px}
+.clip{background:var(--panel);border:1px solid var(--line);border-radius:3px;
+  padding:16px 18px 18px;margin-bottom:14px}
+.clip-head{display:flex;justify-content:space-between;align-items:baseline;gap:16px;
+  flex-wrap:wrap;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--line)}
+.note{font-family:var(--mono);font-size:11.5px;letter-spacing:.13em;text-transform:uppercase;
+  color:var(--muted)}
+.meta{font-family:var(--mono);font-size:12.5px;color:var(--muted);font-variant-numeric:tabular-nums}
+.wer{color:var(--ink);font-weight:600}
+.pairs{display:flex;flex-wrap:wrap;gap:5px 7px}
+.pair{display:flex;flex-direction:column;gap:1px;border-radius:2px;padding:2px 5px}
+.w{font-family:var(--mono);font-size:14px;line-height:1.45;white-space:nowrap}
+.said{color:var(--said)}
+.read{color:var(--read)}
+.pair.eq .said,.pair.eq .read{color:var(--muted)}
+.pair.eq .read{color:var(--ink)}
+.pair.sub{background:var(--read-bg)}
+.pair.ins,.pair.del{background:var(--invented-bg)}
+.pair.ins .read,.pair.del .said{color:var(--invented)}
+.nil{opacity:.4}
+.key{display:flex;flex-wrap:wrap;gap:8px 20px;font-size:13.5px;color:var(--muted);
+  margin-top:6px}
+.key span{display:flex;align-items:center;gap:7px}
+.sw{width:11px;height:11px;border-radius:2px;display:inline-block}
+.bar-row{display:grid;grid-template-columns:64px 1fr 56px;align-items:center;gap:12px;
+  font-family:var(--mono);font-size:12.5px;font-variant-numeric:tabular-nums;color:var(--muted)}
+.bt{background:var(--line);height:15px;border-radius:2px;overflow:hidden}
+.bf{display:block;height:100%;background:var(--said);border-radius:2px}
+.bar-row:last-child .bf{background:var(--invented)}
+.bar-row:first-child .bf{background:var(--said)}
+.bn{text-align:right;color:var(--ink)}
+.chart{display:flex;flex-direction:column;gap:5px;background:var(--panel);
+  border:1px solid var(--line);border-radius:3px;padding:18px}
+.tl{position:relative;height:34px;background:var(--said-bg);border-radius:3px;
+  border:1px solid var(--line);margin:20px 0 4px}
+.band{position:absolute;top:0;bottom:0;background:var(--invented);opacity:.85}
+.axis{position:relative;height:20px;font-family:var(--mono);font-size:11.5px;color:var(--muted)}
+.tick{position:absolute;transform:translateX(-50%);white-space:nowrap}
+.tick i{display:block;width:1px;height:5px;background:var(--line);margin:0 auto 2px}
+blockquote{margin:0;padding:14px 18px;background:var(--panel);border:1px solid var(--line);
+  border-left:2px solid var(--read);border-radius:3px;font-family:var(--mono);font-size:14px;
+  line-height:1.75}
+blockquote b{color:var(--read);font-weight:600}
+.foot{color:var(--muted);font-size:14.5px;border-top:1px solid var(--line);padding-top:24px}
+code{font-family:var(--mono);font-size:.9em;background:var(--panel);border:1px solid var(--line);
+  padding:1px 5px;border-radius:2px}
+a{color:var(--said)}
+:focus-visible{outline:2px solid var(--read);outline-offset:2px}
+</style>
+
+<div class="wrap">
+
+<header>
+  <p class="eyebrow">VoxLens · silent video in, text out</p>
+  <h1>What a machine reads off your lips</h1>
+  <p class="lede">Every line below was produced from video alone — no audio, at any stage.
+  The model watched a mouth move and guessed at the words. Here is how close it got,
+  measured across the full 1,321-clip benchmark.</p>
+</header>
+
+<section>
+  <div class="stats">
+    <div class="stat"><span class="n">34.28%</span><span class="l">of words wrong, overall</span></div>
+    <div class="stat"><span class="n">415</span><span class="l">of 1,321 clips read exactly</span></div>
+    <div class="stat"><span class="n">10×</span><span class="l">faster than real time</span></div>
+    <div class="stat"><span class="n">50 min</span><span class="l">of video scored</span></div>
+  </div>
+</section>
+
+<section>
+  <h2>Said, and read</h2>
+  <p>The top word in each pair is what the speaker actually said. The bottom word is what
+  VoxLens read off their lips.</p>
+  <div class="key">
+    <span><i class="sw" style="background:var(--line)"></i> matched</span>
+    <span><i class="sw" style="background:var(--read)"></i> wrong word</span>
+    <span><i class="sw" style="background:var(--invented)"></i> invented or missed</span>
+  </div>
+  <div style="margin-top:20px">
+  <article class="clip">
+  <header class="clip-head">
+    <span class="note">read exactly</span>
+    <span class="meta"><span class="wer">0%</span> word errors · 3.8s</span>
+  </header>
+  <div class="pairs"><div class="pair eq"><span class="w said">the</span><span class="w read">the</span></div><div class="pair eq"><span class="w said">choices</span><span class="w read">choices</span></div><div class="pair eq"><span class="w said">don&#x27;t</span><span class="w read">don&#x27;t</span></div><div class="pair eq"><span class="w said">make</span><span class="w read">make</span></div><div class="pair eq"><span class="w said">sense</span><span class="w read">sense</span></div><div class="pair eq"><span class="w said">because</span><span class="w read">because</span></div><div class="pair eq"><span class="w said">it&#x27;s</span><span class="w read">it&#x27;s</span></div><div class="pair eq"><span class="w said">the</span><span class="w read">the</span></div><div class="pair eq"><span class="w said">wrong</span><span class="w read">wrong</span></div><div class="pair eq"><span class="w said">question</span><span class="w read">question</span></div></div>
+</article>
+<article class="clip">
+  <header class="clip-head">
+    <span class="note">read exactly</span>
+    <span class="meta"><span class="wer">0%</span> word errors · 1.8s</span>
+  </header>
+  <div class="pairs"><div class="pair eq"><span class="w said">we</span><span class="w read">we</span></div><div class="pair eq"><span class="w said">know</span><span class="w read">know</span></div><div class="pair eq"><span class="w said">why</span><span class="w read">why</span></div><div class="pair eq"><span class="w said">kids</span><span class="w read">kids</span></div><div class="pair eq"><span class="w said">don&#x27;t</span><span class="w read">don&#x27;t</span></div><div class="pair eq"><span class="w said">learn</span><span class="w read">learn</span></div></div>
+</article>
+<article class="clip">
+  <header class="clip-head">
+    <span class="note">close, but wrong</span>
+    <span class="meta"><span class="wer">22%</span> word errors · 5.7s</span>
+  </header>
+  <div class="pairs"><div class="pair eq"><span class="w said">the</span><span class="w read">the</span></div><div class="pair eq"><span class="w said">authors</span><span class="w read">authors</span></div><div class="pair eq"><span class="w said">looked</span><span class="w read">looked</span></div><div class="pair eq"><span class="w said">at</span><span class="w read">at</span></div><div class="pair eq"><span class="w said">papers</span><span class="w read">papers</span></div><div class="pair eq"><span class="w said">written</span><span class="w read">written</span></div><div class="pair eq"><span class="w said">over</span><span class="w read">over</span></div><div class="pair eq"><span class="w said">a</span><span class="w read">a</span></div><div class="pair eq"><span class="w said">10</span><span class="w read">10</span></div><div class="pair eq"><span class="w said">year</span><span class="w read">year</span></div><div class="pair eq"><span class="w said">period</span><span class="w read">period</span></div><div class="pair eq"><span class="w said">and</span><span class="w read">and</span></div><div class="pair sub"><span class="w said">hundreds</span><span class="w read">ostracized</span></div><div class="pair sub"><span class="w said">had</span><span class="w read">them</span></div><div class="pair sub"><span class="w said">to</span><span class="w read">and</span></div><div class="pair sub"><span class="w said">be</span><span class="w read"><span class="nil">—</span></span></div><div class="pair eq"><span class="w said">thrown</span><span class="w read">thrown</span></div><div class="pair eq"><span class="w said">out</span><span class="w read">out</span></div></div>
+</article>
+<article class="clip">
+  <header class="clip-head">
+    <span class="note">close, but wrong</span>
+    <span class="meta"><span class="wer">22%</span> word errors · 3.0s</span>
+  </header>
+  <div class="pairs"><div class="pair eq"><span class="w said">for</span><span class="w read">for</span></div><div class="pair eq"><span class="w said">depression</span><span class="w read">depression</span></div><div class="pair eq"><span class="w said">it</span><span class="w read">it</span></div><div class="pair eq"><span class="w said">was</span><span class="w read">was</span></div><div class="pair sub"><span class="w said">four</span><span class="w read">a</span></div><div class="pair sub"><span class="w said"><span class="nil">—</span></span><span class="w read">few</span></div><div class="pair eq"><span class="w said">and</span><span class="w read">and</span></div><div class="pair eq"><span class="w said">a</span><span class="w read">a</span></div><div class="pair eq"><span class="w said">half</span><span class="w read">half</span></div><div class="pair eq"><span class="w said">times</span><span class="w read">times</span></div></div>
+</article>
+<article class="clip">
+  <header class="clip-head">
+    <span class="note">close, but wrong</span>
+    <span class="meta"><span class="wer">22%</span> word errors · 2.0s</span>
+  </header>
+  <div class="pairs"><div class="pair eq"><span class="w said">so</span><span class="w read">so</span></div><div class="pair eq"><span class="w said">i&#x27;d</span><span class="w read">i&#x27;d</span></div><div class="pair eq"><span class="w said">like</span><span class="w read">like</span></div><div class="pair eq"><span class="w said">to</span><span class="w read">to</span></div><div class="pair eq"><span class="w said">leave</span><span class="w read">leave</span></div><div class="pair eq"><span class="w said">you</span><span class="w read">you</span></div><div class="pair eq"><span class="w said">with</span><span class="w read">with</span></div><div class="pair sub"><span class="w said">these</span><span class="w read">this</span></div><div class="pair sub"><span class="w said">thoughts</span><span class="w read">thought</span></div></div>
+</article>
+<article class="clip">
+  <header class="clip-head">
+    <span class="note">lost the thread</span>
+    <span class="meta"><span class="wer">160%</span> word errors · 1.4s</span>
+  </header>
+  <div class="pairs"><div class="pair sub"><span class="w said">but</span><span class="w read">so</span></div><div class="pair sub"><span class="w said">it&#x27;s</span><span class="w read">i&#x27;m</span></div><div class="pair sub"><span class="w said">not</span><span class="w read">going</span></div><div class="pair sub"><span class="w said">just</span><span class="w read">to</span></div><div class="pair sub"><span class="w said">china</span><span class="w read">talk</span></div><div class="pair sub"><span class="w said"><span class="nil">—</span></span><span class="w read">a</span></div><div class="pair sub"><span class="w said"><span class="nil">—</span></span><span class="w read">little</span></div><div class="pair sub"><span class="w said"><span class="nil">—</span></span><span class="w read">bit</span></div></div>
+</article>
+<article class="clip">
+  <header class="clip-head">
+    <span class="note">lost the thread</span>
+    <span class="meta"><span class="wer">180%</span> word errors · 1.8s</span>
+  </header>
+  <div class="pairs"><div class="pair sub"><span class="w said">you&#x27;re</span><span class="w read">so</span></div><div class="pair sub"><span class="w said">doing</span><span class="w read">i&#x27;m</span></div><div class="pair sub"><span class="w said">incredibly</span><span class="w read">going</span></div><div class="pair sub"><span class="w said">important</span><span class="w read">to</span></div><div class="pair sub"><span class="w said">work</span><span class="w read">talk</span></div><div class="pair sub"><span class="w said"><span class="nil">—</span></span><span class="w read">about</span></div><div class="pair sub"><span class="w said"><span class="nil">—</span></span><span class="w read">my</span></div><div class="pair sub"><span class="w said"><span class="nil">—</span></span><span class="w read">first</span></div><div class="pair sub"><span class="w said"><span class="nil">—</span></span><span class="w read">one</span></div></div>
+</article>
+  </div>
+</section>
+
+<section>
+  <h2>Why it confuses those particular words</h2>
+  <p>Look at what it swaps. <em>Wash</em> becomes <em>wish</em>. <em>Backed</em> becomes
+  <em>banks</em>. These are not random errors — they are words that look almost identical
+  on the mouth.</p>
+  <blockquote>
+    p · b · m &nbsp;→&nbsp; lips together, then apart<br>
+    <b>“pat”, “bat” and “mat” are the same video.</b>
+  </blockquote>
+  <p style="margin-top:14px">The difference between them is voicing and airflow, both of which
+  happen inside the throat where no camera can see. English has around 44 distinct sounds but
+  only about a dozen distinguishable mouth shapes, so entire groups of words collapse into one
+  another. Human lip-readers hit roughly 30–45% word accuracy on unconstrained speech for the
+  same reason. Context has to do the rest of the work — for the machine as much as for a person.</p>
+</section>
+
+<section>
+  <h2>It rarely half-works</h2>
+  <p>The failure pattern is not a gentle slope. Clips cluster at the ends: read perfectly,
+  or lost entirely. 461 clips came in under 10% word errors, while 193 were
+  worse than 100% — the model inventing more words than were spoken.</p>
+  <div class="chart">
+    <div class="bar-row"><span class="bl">0–9</span><span class="bt"><span class="bf" style="width:100.0%"></span></span><span class="bn">461</span></div>
+<div class="bar-row"><span class="bl">10–19</span><span class="bt"><span class="bf" style="width:25.2%"></span></span><span class="bn">116</span></div>
+<div class="bar-row"><span class="bl">20–29</span><span class="bt"><span class="bf" style="width:29.1%"></span></span><span class="bn">134</span></div>
+<div class="bar-row"><span class="bl">30–39</span><span class="bt"><span class="bf" style="width:17.1%"></span></span><span class="bn">79</span></div>
+<div class="bar-row"><span class="bl">40–49</span><span class="bt"><span class="bf" style="width:14.1%"></span></span><span class="bn">65</span></div>
+<div class="bar-row"><span class="bl">50–59</span><span class="bt"><span class="bf" style="width:19.3%"></span></span><span class="bn">89</span></div>
+<div class="bar-row"><span class="bl">60–69</span><span class="bt"><span class="bf" style="width:16.3%"></span></span><span class="bn">75</span></div>
+<div class="bar-row"><span class="bl">70–79</span><span class="bt"><span class="bf" style="width:11.3%"></span></span><span class="bn">52</span></div>
+<div class="bar-row"><span class="bl">80–89</span><span class="bt"><span class="bf" style="width:11.1%"></span></span><span class="bn">51</span></div>
+<div class="bar-row"><span class="bl">90–99</span><span class="bt"><span class="bf" style="width:1.3%"></span></span><span class="bn">6</span></div>
+<div class="bar-row"><span class="bl">100+</span><span class="bt"><span class="bf" style="width:41.9%"></span></span><span class="bn">193</span></div>
+  </div>
+  <p style="margin-top:12px;font-size:14px;color:var(--muted)">Clips by word error rate, all
+  1,321 in the benchmark.</p>
+</section>
+
+<section>
+  <h2>When it cannot see the mouth</h2>
+  <p>On real footage the face turns away, blurs, or leaves frame. VoxLens marks those stretches
+  rather than quietly inventing words to fill them. This is one 8.3-second clip; the marked
+  bands are the moments it was reading nothing.</p>
+  <div class="tl"><span class="band" style="left:15.87%;width:1.44%" title="1.32s – 1.44s"></span><span class="band" style="left:26.44%;width:1.44%" title="2.20s – 2.32s"></span><span class="band" style="left:32.21%;width:2.88%" title="2.68s – 2.92s"></span><span class="band" style="left:41.35%;width:7.21%" title="3.44s – 4.04s"></span><span class="band" style="left:57.69%;width:1.44%" title="4.80s – 4.92s"></span><span class="band" style="left:82.21%;width:2.88%" title="6.84s – 7.08s"></span></div>
+  <div class="axis"><span class="tick" style="left:0.00%"><i></i>0s</span><span class="tick" style="left:24.04%"><i></i>2s</span><span class="tick" style="left:48.08%"><i></i>4s</span><span class="tick" style="left:72.12%"><i></i>6s</span><span class="tick" style="left:96.15%"><i></i>8s</span></div>
+  <p style="margin-top:16px">Six unreadable stretches, 61 of 208 frames. The longest ran 0.6
+  seconds — long enough to lose several words. The tool reports where they fall, and stops
+  short of claiming which words they cost, because that would mean pretending to a precision
+  it does not have.</p>
+</section>
+
+<footer class="foot">
+  <p><b>What this is measured on.</b> The LRS3 benchmark test split, 50 minutes of video,
+  9,890 words, greedy decoding. Benchmark video is cleanly shot and cleanly cropped. On
+  in-the-wild footage the same model scores closer to 48% word errors — roughly every other
+  word — so treat the number above as the optimistic end.</p>
+  <p style="margin-bottom:0">These figures are a regression baseline for this pipeline measured
+  against itself, not a claim of parity with published research.</p>
+</footer>
+
+</div>
+</body>
+</html>
