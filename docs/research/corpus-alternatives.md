@@ -19,7 +19,8 @@ Both carry the same caveat: the permissive licence covers the **metadata**, not 
 | --- | --- | --- | --- |
 | **GRID** (Zenodo record 3625687) | **CC BY 4.0**, open, no signup | 16,211,527_582 B = 16.21 GB | Constrained 6-word grammar, 34 talkers × 1,000 sentences, English |
 | **Lombard GRID** | **CC BY 4.0**, direct download | 2,485,003,295 B = 2.49 GB | GRID grammar, frontal **and profile** views, 54 talkers |
-| **CREMA-D** | **ODbL 1.0 + DbCL 1.0** | ~7.55 GB | 12 fixed sentences, 91 actors — the only clearly commercial-permissive licence found |
+| **CREMA-D** | **ODbL 1.0 + DbCL 1.0** | 3,745,152,087 B = 3.75 GB working tree (7.55 GB to clone — git-lfs keeps a second copy) | 12 fixed sentences, 91 actors, `.flv` video — the only clearly commercial-permissive licence found |
+| **RAVDESS** (Zenodo 1188976) | CC BY-**NC**-SA 4.0; commercial licence purchasable | 25,600,214,208 B = 25.60 GB (47 video zips = 25.17 GB) | **2 sentences only** — an eval/emotion set, not a training corpus |
 | **NTCD-TIMIT** (Zenodo 260228) | CC BY-**NC** 4.0, open | 44,796,013,834 B = 44.80 GB | TCD-TIMIT derived: audio + **pre-extracted visual features, no raw video** |
 
 Zenodo's GRID description claims the per-talker zips hold ".jpg videos" — this is wrong. Reading `s1.zip` local file headers via HTTP range request shows `s1/bbaf2n.mpg`. They are MPG. GRID's high-quality video tier is ~81 GB and will **not** fit 78 GB; the normal-quality Zenodo package will.
@@ -49,6 +50,24 @@ Prefer the Zenodo GRID copy over Sheffield's: Sheffield offers only "freely avai
 4. **For unconstrained English at scale**: MultiVSR metadata + your own YouTube fetch of an English subset, or the VoxPopuli CC0 route.
 5. **Do not plan around** TCD-TIMIT, LRW/LRS2, LRW-1000/CAS-VSR/CMLR, or MuAViC-English.
 
+## Acted emotional corpora, verified in detail
+
+A follow-on pass closed the open questions on these three. **None contains unconstrained continuous speech** — all are acted, fixed-script read speech — so none substitutes for a real lip-reading corpus.
+
+- **MEAD** — **442,952,785,920 B (442.95 GB)**, computed from the official Drive folders' embedded metadata. Terms of Use clause (1): *"used for non-commercial/non-profit research purposes only"*, clause (2) narrows further to "academic purposes". **Only Part0 (48 of 60 actors) ever shipped** — the Part1 release promised for June 2021 never happened, and actor `W021` has audio but no video. Best phonetic coverage of the three (159 TIMIT-derived sentences, 1080p, 7 camera views) and the worst terms. The repo's MIT badge covers the **baseline model code only**, not the data — an easy and expensive conflation.
+- **CREMA-D** — **3,745,152,087 B** working tree, derived by summing all 22,326 git-lfs pointers. ODbL 1.0 + DbCL 1.0, **commercial use permitted**, no gate (the Google Form is a courtesy census). Video is `.flv` and needs transcoding; `VideoFlash` alone is 2.44 GB. Note GitHub classifies the licence as `NOASSERTION`, so automated scanners will flag it.
+- **RAVDESS** — **25,600,214,208 B**, summed from all 49 Zenodo file sizes. CC BY-NC-SA 4.0. The original `smartlaboratory.org` host is **404**; it moved to `affectivedatascience.com` after the Ryerson → Toronto Metropolitan rename. Two sentences total ("Kids are talking by the door" / "Dogs are sitting by the door"), which makes it near-useless for training and fine as a held-out eval set. A commercial licence is genuinely purchasable (CAD $6k–$20k depending on term and company size).
+
+### One finding that bears directly on #10
+
+RAVDESS is the only rights-holder found that states explicitly whether its data restrictions **run with the model weights**:
+
+> "This licence applies only to use of the RAVDESS recordings themselves. It does not apply to models, model weights, embeddings, extracted features, annotations, predictions, statistics, software, or other outputs derived from the recordings, provided that those outputs do not contain or reproduce the original RAVDESS recordings or any substantial portion of them."
+
+The same page still requires an active commercial licence whenever the recordings are "used, copied, processed, or accessed for active commercial work… including retraining, fine-tuning, benchmarking, validation, feature extraction."
+
+This is one dataset owner's position on one dataset, not a general legal rule, and it says nothing about what LRS2's or LRS3's terms mean. But #10's pivotal question is whether training-data restrictions travel with released weights, and this is a concrete instance of a rights-holder answering "no, provided the output does not reproduce the source" — while still gating the *act of training* itself. Both halves matter.
+
 ## Unverified — how to close each
 
 | Item | How to close |
@@ -60,5 +79,5 @@ Prefer the Zenodo GRID copy over Sheffield's: Sheffield offers only "freely avai
 | AVSpeech media size | Unknowable in advance. Run the downloader with `dryrun=1` on a sample. |
 | WildVSR size and licence | Repo has **no LICENSE file**; the CC BY-NC-ND attribution circulating for it is unverified. The 91,755,398 B figure comes from the Drive page, not a labelled size — open it signed in. Email the authors for a licence statement. |
 | LRS-VoxMM size | Not stated in the paper or on the project page. |
-| MEAD size and licence | No licence published anywhere. Email the authors. |
+| ~~MEAD size and licence~~ | **Closed.** See below — 442.95 GB, non-commercial research only. |
 | MultiVSR English hours | Not broken out. Derive from `ytids.txt` plus the language column in `train_major.csv`. |
