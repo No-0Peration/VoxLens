@@ -1,25 +1,8 @@
-VoxLens
-Copyright (c) 2026 Gerben Visser
-
-Licensed under the PolyForm Noncommercial License 1.0.0, reproduced in full
-below. In short: you may use, modify and share VoxLens for any noncommercial
-purpose, including personal use and research.
-
-Why noncommercial rather than a permissive licence: VoxLens is built on the
-USR 2.0 recogniser, which is licensed CC BY-NC 4.0 covering both its code and
-its weights, and the patches in patches/ contain excerpts of that code. A
-permissive licence here would promise a freedom the pipeline as a whole cannot
-deliver. See docs/adr/0003-usr2-large-non-commercial.md.
-
-This licence covers VoxLens's own code and documentation. It does not grant any
-rights in the third-party components VoxLens depends on, the model weights, or
-the corpora used to evaluate it — each carries its own terms. See NOTICE.
-
-----------------------------------------------------------------------
-
 # PolyForm Noncommercial License 1.0.0
 
 <https://polyformproject.org/licenses/noncommercial/1.0.0>
+
+Copyright (c) 2026 Gerben Visser
 
 https://polyformproject.org/licenses/noncommercial/1.0.0
 

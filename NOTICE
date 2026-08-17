@@ -11,6 +11,26 @@ corpus data, no vendored upstream source. They are fetched at setup time or
 supplied by you.
 
 
+Why VoxLens is noncommercial
+----------------------------
+
+Not a preference — the only honest option. The licence restriction is inherited,
+and it is inherited three times over:
+
+    the recogniser        USR 2.0, CC BY-NC 4.0, covering code AND weights
+    our patches           contain excerpts of that code
+    the training data     LRS3, TED-derived, CC BY-NC-ND
+
+Relicensing VoxLens's own code permissively would change nothing about that
+chain: no commercially-usable visual speech recognition checkpoint was found to
+exist at all. A permissive licence here would advertise a freedom the pipeline
+cannot deliver, which on a public repository is a claim someone might act on
+before discovering it is false.
+
+See docs/adr/0003-usr2-large-non-commercial.md for the full reasoning, and
+docs/research/pretrained-checkpoints.md for the survey it rests on.
+
+
 The recogniser
 --------------
 
