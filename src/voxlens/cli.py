@@ -1,0 +1,102 @@
+"""The voxlens command line.
+
+This is the seam (ADR-0007): tests and the evaluation harness both go through
+it, so what is measured is what a user gets. It orchestrates and renders; it
+holds no recognition logic of its own.
+"""
+from __future__ import annotations
+
+import argparse
+import sys
+import time
+
+from voxlens.devices import DEFAULT_DEVICE, resolve_device
+from voxlens.extraction import MouthRegionError, extract_mouth_regions
+from voxlens.video import UnreadableClipError, decode_clip
+
+__all__ = ["main"]
+
+EXIT_OK = 0
+EXIT_UNREADABLE = 1  # the Clip decoded, but the mouth could not be read
+EXIT_BAD_INPUT = 2  # the Clip is missing or will not decode
+EXIT_MODEL = 3  # the checkpoint is missing or will not load
+
+
+def build_parser() -> argparse.ArgumentParser:
+    parser = argparse.ArgumentParser(
+        prog="voxlens",
+        description="Read speech from the visible movement of a Speaker's mouth. "
+        "No audio is used.",
+    )
+    parser.add_argument("video", help="path to a video file holding one Clip")
+    parser.add_argument(
+        "--checkpoint",
+        required=True,
+        help="path to the USR 2.0 Large checkpoint (never downloaded for you)",
+    )
+    parser.add_argument(
+        "--device",
+        default=DEFAULT_DEVICE,
+        choices=["hybrid", "mps", "cpu"],
+        help="hybrid runs the encoder on the GPU and the search on the CPU, "
+        "which is the fastest measured configuration (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--beam",
+        type=int,
+        default=1,
+        help="beam width; 1 is greedy and roughly 16x faster than 40 "
+        "(default: %(default)s)",
+    )
+    return parser
+
+
+def main(argv: list[str] | None = None) -> int:
+    args = build_parser().parse_args(argv)
+
+    try:
+        plan = resolve_device(args.device)
+    except RuntimeError as exc:
+        print(f"voxlens: {exc}", file=sys.stderr)
+        return EXIT_BAD_INPUT
+
+    try:
+        clip = decode_clip(args.video)
+    except UnreadableClipError as exc:
+        print(f"voxlens: {exc}", file=sys.stderr)
+        return EXIT_BAD_INPUT
+
+    started = time.perf_counter()
+    try:
+        regions = extract_mouth_regions(clip.frames)
+    except MouthRegionError as exc:
+        print(f"voxlens: {exc}", file=sys.stderr)
+        return EXIT_UNREADABLE
+    extract_s = time.perf_counter() - started
+
+    # Imported here so that the failures above do not pay for loading torch.
+    from voxlens.recogniser import load_recogniser
+
+    try:
+        recogniser = load_recogniser(args.checkpoint, plan, beam=args.beam)
+    except Exception as exc:  # checkpoint absent, corrupt, or wrong architecture
+        print(f"voxlens: could not load the recogniser: {exc}", file=sys.stderr)
+        return EXIT_MODEL
+
+    started = time.perf_counter()
+    transcript = recogniser.transcribe(regions.crops)
+    infer_s = time.perf_counter() - started
+
+    print(transcript)
+
+    rtf = (extract_s + infer_s) / clip.duration_s if clip.duration_s else float("nan")
+    print(
+        f"{clip.frame_count} frames, {clip.duration_s:.1f}s, RTF {rtf:.2f}"
+        f"  |  {regions.undetected_count} frame(s) with no detected face",
+        file=sys.stderr,
+    )
+    return EXIT_OK
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

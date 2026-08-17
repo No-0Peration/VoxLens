@@ -17,6 +17,7 @@ from voxlens.devices import DevicePlan
 __all__ = [
     "UPSTREAM_REPO",
     "UPSTREAM_REV",
+    "ensure_importable",
     "is_vendored",
     "load_encoder",
     "patches_dir",
@@ -50,11 +51,11 @@ def patches_dir() -> Path:
 def is_vendored() -> bool:
     if not (vendored_path() / _VENDOR_MARKER).is_dir():
         return False
-    _ensure_importable()
+    ensure_importable()
     return True
 
 
-def _ensure_importable() -> None:
+def ensure_importable() -> None:
     """Put the vendored tree on sys.path — it is a script tree, not a package."""
     path = str(vendored_path())
     if path not in sys.path:
@@ -63,7 +64,7 @@ def _ensure_importable() -> None:
 
 def load_config():
     """Compose the upstream Hydra config for the chosen backbone."""
-    _ensure_importable()
+    ensure_importable()
     from hydra import compose, initialize_config_dir
 
     with initialize_config_dir(config_dir=str(vendored_path() / "conf"), version_base="1.3"):
@@ -77,7 +78,7 @@ def load_encoder(checkpoint_path: str | Path, plan: DevicePlan):
     the encoder separable is a standing constraint (it is the streaming-critical
     component and the natural Core ML conversion unit).
     """
-    _ensure_importable()
+    ensure_importable()
     from espnet.nets.pytorch_backend.e2e_asr_transformer import E2E
     from utils.utils import UNIGRAM1000_LIST
 
