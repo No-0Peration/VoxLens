@@ -100,3 +100,14 @@ Two seams: the **CLI process boundary**, and the **occlusion span function**. Th
 | [0006](adr/0006-vendor-upstream-with-patches.md) | Vendor upstream at a pinned revision, with patches |
 | [0007](adr/0007-the-cli-is-the-seam.md) | The CLI is the seam |
 | [0008](adr/0008-occlusion-as-spans.md) | Occlusion as spans, not per-word |
+
+Decisions taken for [live capture](live-capture.md), which is designed but not built.
+Each is the definition of done for its ticket rather than a record of something that
+exists:
+
+| ADR | Decision | Status |
+| --- | --- | --- |
+| [0009](adr/0009-phone-is-a-camera-not-the-model-host.md) | The phone is a camera, not the model host | proposed |
+| [0010](adr/0010-read-on-screen-never-aloud.md) | Read on screen, never aloud | proposed |
+| [0011](adr/0011-confidence-from-decoder-disagreement.md) | Confidence from decoder disagreement | proposed |
+| [0012](adr/0012-windowed-decoding-not-true-streaming.md) | Windowed decoding, not true streaming | proposed |

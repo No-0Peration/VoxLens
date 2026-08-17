@@ -1,5 +1,7 @@
 # Read on screen, never aloud — and not sold as an accessibility aid
 
+**Status:** proposed — decided, **not built**. This ADR is the **definition of done** for [#20](https://github.com/No-0Peration/VoxLens/issues/20): that work is complete when the code does what is described here, and this status becomes `accepted`. If building it shows the decision does not hold, amend this ADR rather than leaving it standing while the code says otherwise.
+
 Live capture displays text. It never speaks the transcript with a synthetic voice, and it is not presented to deaf or hard-of-hearing users as an assistive tool.
 
 At 48% word errors on real footage, roughly every other word is wrong, and the errors are fluent: *"of those seven have nuclear weapons"* was read as *"if you use seven if you use a weapon"*. Read aloud in a confident voice, that removes the only signal warning the listener — text on a screen can be doubted, a spoken sentence is simply believed.

@@ -1,5 +1,7 @@
 # Occlusion is reported as spans, not marked per word
 
+**Status:** accepted — decided and implemented, then amended once when building falsified part of it (see the amendment on [#6](https://github.com/No-0Peration/VoxLens/issues/6)).
+
 When the Speaker's mouth cannot be read, VoxLens reports **time ranges** alongside the Transcript. It does not mark individual words as read or unreadable.
 
 The original design did intend per-word marking, positioned using the CTC head's frame-level alignment — the encoder does not downsample, so alignment is exact at 40 ms. Building it falsified the approach: **the CTC head and beam search produce different transcriptions of the same Clip.** The alignment is precise; it simply aligns a transcription other than the one the CLI prints.

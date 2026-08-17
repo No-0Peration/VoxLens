@@ -1,5 +1,7 @@
 # The CLI is the seam, and the evaluation harness goes through it
 
+**Status:** accepted — decided and implemented.
+
 VoxLens is tested at **two seams**: the CLI process boundary, and one pure function that turns a per-Frame detection mask into Occlusion spans. The evaluation harness drives the **CLI**, not internal Python APIs.
 
 Most projects would reach for unit tests per module. That is rejected here deliberately.

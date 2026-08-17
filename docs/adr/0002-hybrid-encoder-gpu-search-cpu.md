@@ -1,5 +1,7 @@
 # Hybrid execution: encoder on the GPU, beam search on the CPU
 
+**Status:** accepted — decided and implemented.
+
 VoxLens runs the recogniser's encoder on Apple Silicon's GPU (MPS) and its decoder and beam search on the CPU, rather than putting the whole model on one device. Measured on an M4 Pro over 100 Clips at beam 1, this runs at **RTF 0.099** against 0.128 all-GPU and 0.232 all-CPU, at identical WER and lower memory.
 
 The split is not a workaround. The encoder is dense 3D convolution — what a GPU is for — while beam search is hundreds of tiny sequential steps, where per-kernel launch overhead on MPS outweighs any throughput gain. Transfer cost between the two is ~0.004 RTF, small enough not to erode the benefit.

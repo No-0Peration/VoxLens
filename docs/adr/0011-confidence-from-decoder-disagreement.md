@@ -1,5 +1,7 @@
 # Confidence from decoder disagreement
 
+**Status:** proposed — decided, **not built**. This ADR is the **definition of done** for [#22](https://github.com/No-0Peration/VoxLens/issues/22): that work is complete when the code does what is described here, and this status becomes `accepted`. If building it shows the decision does not hold, amend this ADR rather than leaving it standing while the code says otherwise.
+
 Per-sentence confidence is derived from how much the **CTC** and **beam-search** decoders disagree about the same Clip. Both read the same encoder output; agreement is evidence, divergence is doubt.
 
 This reuses something previously treated only as an obstacle. The two decoders routinely produce different transcriptions — that is why [ADR-0008](0008-occlusion-as-spans.md) exists and why per-word Occlusion marking was abandoned. The divergence does not stop being inconvenient; it turns out to also be informative.

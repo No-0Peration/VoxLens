@@ -1,5 +1,7 @@
 # Vendor the upstream recogniser at a pinned revision, with patches
 
+**Status:** accepted — decided and implemented.
+
 VoxLens does not fork the USR 2.0 repository, vendor a frozen copy, or depend on it as a package. It **clones a pinned revision into `vendor/` and applies patch files from `patches/`**, driven by `scripts/vendor.py`. `vendor/` is generated and never committed.
 
 The upstream repository is a research script tree, not a library: it has no package metadata, no release cadence, and does not run on Apple Silicon as published. Something had to change, and the question was where those changes live.

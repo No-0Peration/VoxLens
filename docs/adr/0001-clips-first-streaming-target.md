@@ -1,5 +1,7 @@
 # Clips first, streaming as the target
 
+**Status:** accepted — decided and implemented.
+
 VoxLens exists to read lips from a live Stream in real time, but the first implementations will process bounded Clips. Clips reach a working baseline faster and make published lip-reading benchmarks directly usable, so they are a development vehicle — not a second supported product mode.
 
 ## Consequences

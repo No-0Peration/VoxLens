@@ -1,5 +1,7 @@
 # Two evaluation bars, and WildVSR as the authoritative one
 
+**Status:** accepted — decided and implemented.
+
 VoxLens measures WER against **two** corpora with different jobs. LRS3's test split is the **calibration** bar — it is what published figures are quoted against, so its purpose is to confirm preprocessing is correct. WildVSR is the **honest** bar, and the authoritative one for judging whether the approach works.
 
 A single LRS3 number would be self-flattering. The same model scores 17.6% on LRS3 and 73.7% on WildVSR in published results; measured here at beam 1, 34.22% and 47.85%. Reporting only the first would describe benchmark fit rather than capability.

@@ -1,5 +1,7 @@
 # MediaPipe for Mouth Region extraction, pinned to 0.10.35
 
+**Status:** accepted — decided and implemented.
+
 The Mouth Region is extracted with MediaPipe FaceLandmarker, using upstream's bundled task file and its 478→68 landmark mapping. Measured at 4.2 ms per Frame (RTF 0.111), essentially resolution-independent because MediaPipe resizes internally, and producing the 96×96 RGB crop the checkpoint expects without adaptation.
 
 RetinaFace + FAN — the higher-accuracy alternative — **requires a CUDA GPU** per upstream's own documentation, so it is unavailable on the target hardware. That fact alone settles the choice.

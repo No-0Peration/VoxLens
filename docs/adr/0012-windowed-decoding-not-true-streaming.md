@@ -1,5 +1,7 @@
 # Windowed decoding, not true streaming
 
+**Status:** proposed — decided, **not built**. This ADR is the **definition of done** for [#21](https://github.com/No-0Peration/VoxLens/issues/21): that work is complete when the code does what is described here, and this status becomes `accepted`. If building it shows the decision does not hold, amend this ADR rather than leaving it standing while the code says otherwise.
+
 Live capture decodes three-second windows advancing one second at a time, running roughly two seconds behind the speaker, with additional cuts at Occlusions. It does not attempt frame-by-frame streaming.
 
 [ADR-0001](0001-clips-first-streaming-target.md) names real-time streaming as the destination. This is how that destination is approached without first replacing the model: true streaming needs a causal encoder, and this one is a transformer that attends across the whole input. Within a three-second window it may attend freely — the window is complete before it is decoded.
