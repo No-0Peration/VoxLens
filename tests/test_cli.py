@@ -202,3 +202,69 @@ def test_the_transcript_on_stdout_stays_free_of_occlusion_markers():
     assert "unreadable" in plain.stderr
     payload = json.loads(run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json").stdout)
     assert plain.stdout.strip() == payload["transcript"]
+
+
+# --- exit codes (#16) ------------------------------------------------------
+# 1 vs 2 is the distinction that matters: a harness running hundreds of Clips
+# must tell "this video is unusable" from "this invocation is wrong".
+
+@needs_upstream
+def test_a_missing_checkpoint_is_a_model_failure_not_bad_input(faceless_clip, tmp_path):
+    """Reached only once the Clip is fine, so it cannot be confused with exit 2."""
+    result = run_cli(str(tmp_path / "absent.pth"), "--checkpoint", str(tmp_path / "absent.pth"))
+    assert result.returncode == 2  # the video argument is what is missing here
+
+    from voxlens.recogniser import CheckpointError, load_recogniser
+    from voxlens.devices import resolve_device
+
+    with pytest.raises(CheckpointError, match="never downloads"):
+        load_recogniser(tmp_path / "absent.pth", resolve_device("cpu"))
+
+
+@needs_upstream
+def test_a_corrupt_checkpoint_is_reported_as_a_model_failure(tmp_path):
+    from voxlens.devices import resolve_device
+    from voxlens.recogniser import CheckpointError, load_recogniser
+
+    junk = tmp_path / "corrupt.pth"
+    junk.write_bytes(b"not a torch checkpoint")
+    with pytest.raises(CheckpointError, match="Could not read"):
+        load_recogniser(junk, resolve_device("cpu"))
+
+
+@needs_upstream
+def test_a_checkpoint_of_the_wrong_architecture_is_rejected(tmp_path):
+    import torch
+
+    from voxlens.devices import resolve_device
+    from voxlens.recogniser import CheckpointError, load_recogniser
+
+    wrong = tmp_path / "wrong.pth"
+    torch.save({"not.a.real.layer": torch.zeros(2)}, wrong)
+    with pytest.raises(CheckpointError, match="not a resnet_transformer_large"):
+        load_recogniser(wrong, resolve_device("cpu"))
+
+
+def test_every_failure_path_keeps_stdout_empty(tmp_path):
+    """Anything on stdout would corrupt a --json consumer downstream."""
+    junk = tmp_path / "junk.mp4"
+    junk.write_bytes(b"nope")
+    for argv in (
+        [str(tmp_path / "missing.mp4"), "--checkpoint", "/dev/null"],
+        [str(junk), "--checkpoint", "/dev/null"],
+    ):
+        result = run_cli(*argv)
+        assert result.returncode != 0
+        assert result.stdout == ""
+        # `in`, not `startswith`: OpenCV/FFmpeg writes its own diagnostics to
+        # stderr first ("moov atom not found"). Noisy, but stderr is the right
+        # stream for it, and the contract is that stdout stays clean.
+        assert "voxlens:" in result.stderr
+
+
+def test_help_documents_the_exit_codes():
+    """A batch script author should not have to read the source."""
+    out = run_cli("--help").stdout
+    assert "exit codes:" in out
+    for code in ("0", "1", "2", "3"):
+        assert f"  {code}  " in out

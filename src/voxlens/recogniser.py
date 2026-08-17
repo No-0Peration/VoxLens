@@ -15,7 +15,15 @@ import torch
 from voxlens.devices import DevicePlan
 from voxlens.upstream import BACKBONE, ensure_importable, load_config, vendored_path
 
-__all__ = ["Recogniser", "load_recogniser"]
+__all__ = ["CheckpointError", "Recogniser", "load_recogniser"]
+
+
+class CheckpointError(RuntimeError):
+    """The checkpoint is missing, unreadable, or not this architecture.
+
+    Named so the CLI can map it to an exit code without swallowing genuine
+    programming errors, which must still surface as tracebacks.
+    """
 
 # The crop contract the checkpoint was trained against. Changing any of these
 # silently degrades accuracy rather than failing, so they are stated once.
@@ -91,7 +99,7 @@ def load_recogniser(checkpoint_path, plan: DevicePlan, beam: int = 1) -> Recogni
 
     checkpoint_path = Path(checkpoint_path)
     if not checkpoint_path.exists():
-        raise FileNotFoundError(
+        raise CheckpointError(
             f"Checkpoint not found: {checkpoint_path}. VoxLens never downloads it — "
             "see docs/setup.md for where to obtain USR 2.0 Large."
         )
@@ -100,7 +108,17 @@ def load_recogniser(checkpoint_path, plan: DevicePlan, beam: int = 1) -> Recogni
     cfg.decode.beam_size = beam
 
     model = E2E(len(UNIGRAM1000_LIST), cfg.model.backbone)
-    state = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    try:
+        state = torch.load(checkpoint_path, map_location="cpu", weights_only=False)
+    except Exception as exc:  # unpickling, truncation, wrong format
+        raise CheckpointError(
+            f"Could not read the checkpoint at {checkpoint_path}: {exc}"
+        ) from exc
+    if not isinstance(state, dict):
+        raise CheckpointError(
+            f"{checkpoint_path} does not contain a state dict "
+            f"(found {type(state).__name__}). Is this a USR 2.0 checkpoint?"
+        )
     if any(k.startswith("_orig_mod.") for k in state):
         state = {k.replace("_orig_mod.", "", 1): v for k, v in state.items()}
     if any(k.startswith("model.backbone.") for k in state):
@@ -109,7 +127,12 @@ def load_recogniser(checkpoint_path, plan: DevicePlan, beam: int = 1) -> Recogni
             for k, v in state.items()
             if k.startswith("model.backbone.")
         }
-    model.load_state_dict(state)
+    try:
+        model.load_state_dict(state)
+    except (RuntimeError, KeyError) as exc:
+        raise CheckpointError(
+            f"{checkpoint_path} is not a {BACKBONE} checkpoint: {exc}"
+        ) from exc
     model.eval()
 
     # The encoder goes where the plan says; everything else follows the decoder,

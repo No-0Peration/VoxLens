@@ -19,10 +19,12 @@ from voxlens.video import UnreadableClipError, decode_clip
 
 __all__ = ["main"]
 
+# A batch run over hundreds of Clips has to tell these apart without parsing
+# prose: 1 means "this video is unusable", 2 means "this invocation is wrong".
 EXIT_OK = 0
-EXIT_UNREADABLE = 1  # the Clip decoded, but the mouth could not be read
-EXIT_BAD_INPUT = 2  # the Clip is missing or will not decode
-EXIT_MODEL = 3  # the checkpoint is missing or will not load
+EXIT_UNREADABLE = 1  # the Clip decoded, but the Speaker's mouth could not be read
+EXIT_BAD_INPUT = 2  # the invocation is wrong: missing/undecodable Clip, bad device
+EXIT_MODEL = 3  # the checkpoint is missing, unreadable, or the wrong architecture
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -30,6 +32,15 @@ def build_parser() -> argparse.ArgumentParser:
         prog="voxlens",
         description="Read speech from the visible movement of a Speaker's mouth. "
         "No audio is used.",
+        epilog=(
+            "exit codes:\n"
+            "  0  a Transcript was produced\n"
+            "  1  the Clip decoded, but the Speaker's mouth could not be read\n"
+            "  2  the invocation is wrong: missing or undecodable Clip, or an\n"
+            "     unavailable device\n"
+            "  3  the checkpoint is missing, unreadable, or the wrong architecture"
+        ),
+        formatter_class=argparse.RawDescriptionHelpFormatter,
     )
     parser.add_argument("video", help="path to a video file holding one Clip")
     parser.add_argument(
@@ -94,12 +105,14 @@ def main(argv: list[str] | None = None) -> int:
     extract_s = time.perf_counter() - started
 
     # Imported here so that the failures above do not pay for loading torch.
-    from voxlens.recogniser import load_recogniser
+    from voxlens.recogniser import CheckpointError, load_recogniser
 
     try:
         recogniser = load_recogniser(args.checkpoint, plan, beam=args.beam)
-    except Exception as exc:  # checkpoint absent, corrupt, or wrong architecture
-        print(f"voxlens: could not load the recogniser: {exc}", file=sys.stderr)
+    except CheckpointError as exc:
+        # Only the known checkpoint failures map to an exit code; a genuine bug
+        # must still surface as a traceback rather than a tidy error message.
+        print(f"voxlens: {exc}", file=sys.stderr)
         return EXIT_MODEL
 
     started = time.perf_counter()
