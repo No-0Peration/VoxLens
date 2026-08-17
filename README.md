@@ -34,6 +34,7 @@ Not built: real-time streaming (Clips only, per [ADR-0001](docs/adr/0001-clips-f
     ├── architecture.md     ← system shape and module boundaries
     ├── adr/               ← architecture decision records
     ├── research/          ← primary-source findings behind the decisions
+    │   └── README.md       ← start here for the research
     └── agents/
 ```
 
@@ -49,7 +50,7 @@ Not built: real-time streaming (Clips only, per [ADR-0001](docs/adr/0001-clips-f
 
 [`docs/adr/`](docs/adr/) records decisions that would otherwise be invisible in the code — clips before streaming, the hybrid GPU/CPU split, the checkpoint and its licence, the extraction stack, and the two evaluation bars.
 
-[`docs/research/`](docs/research/) holds the primary-source work those decisions rest on: licence terms read in full, verified corpus sizes, and what is actually obtainable. Each document separates what was verified from what was inferred.
+[`docs/research/`](docs/research/README.md) holds the primary-source work those decisions rest on: licence terms read in full, verified corpus sizes, and what is actually obtainable. Each document separates what was verified from what was inferred — start with its [README](docs/research/README.md).
 
 ## Working in this repo
 
