@@ -16,6 +16,8 @@ Early and experimental. The repository currently holds project and agent configu
 ├── CONTEXT.md             ← the domain glossary
 ├── AGENTS.md              ← conventions for agents working in this repo
 └── docs/
+    ├── adr/               ← architecture decision records
+    │   └── 0001-clips-first-streaming-target.md
     └── agents/
         ├── issue-tracker.md
         ├── triage-labels.md
@@ -24,9 +26,7 @@ Early and experimental. The repository currently holds project and agent configu
 
 [`CONTEXT.md`](CONTEXT.md) fixes the project's vocabulary. Terms like _Clip_, _Occlusion_, and _Inferred Text_ mean something specific here — use them as defined rather than reaching for a synonym.
 
-One directory will appear as the project grows, created lazily rather than upfront:
-
-- `docs/adr/` — architecture decision records, one file per decision.
+`docs/adr/` records decisions that would otherwise be invisible in the code. Start with [ADR-0001](docs/adr/0001-clips-first-streaming-target.md): VoxLens is built clip-first, but real-time streaming is the actual goal.
 
 ## Working in this repo
 
