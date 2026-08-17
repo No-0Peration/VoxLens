@@ -17,7 +17,12 @@ import numpy as np
 
 from voxlens.upstream import ensure_importable
 
-__all__ = ["ExtractedMouthRegions", "MouthRegionError", "extract_mouth_regions"]
+__all__ = [
+    "ExtractedMouthRegions",
+    "MouthRegionError",
+    "PreCroppedRegions",
+    "extract_mouth_regions",
+]
 
 DETECTOR = "mediapipe"
 
@@ -66,3 +71,20 @@ def extract_mouth_regions(frames: np.ndarray) -> ExtractedMouthRegions:
         )
 
     return ExtractedMouthRegions(crops=crops, undetected=undetected)
+
+
+class PreCroppedRegions(ExtractedMouthRegions):
+    """Frames that are already Mouth Regions, so no detection happened.
+
+    Every obtainable evaluation corpus ships pre-cropped 96x96 mouth ROIs
+    (ADR-0005), which means the corpora exercise the recogniser while bypassing
+    extraction entirely. Running a face detector over them does not merely fail:
+    where it succeeds it crops a "face" out of a mouth and produces garbage.
+
+    Nothing was detected, so nothing can be reported as undetected — and no
+    Occlusion is derivable in this mode. That absence is the honest answer, not
+    a claim that the Speaker was visible throughout.
+    """
+
+    def __init__(self, crops: np.ndarray):
+        super().__init__(crops=crops, undetected=(False,) * len(crops))

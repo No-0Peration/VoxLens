@@ -29,6 +29,7 @@ dependencies = [
 
 [project.scripts]
 voxlens = "voxlens.cli:main"
+voxlens-eval = "voxlens.evaluate:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0"]

@@ -268,3 +268,26 @@ def test_help_documents_the_exit_codes():
     assert "exit codes:" in out
     for code in ("0", "1", "2", "3"):
         assert f"  {code}  " in out
+
+
+@needs_upstream
+def test_pre_cropped_mode_skips_face_detection(faceless_clip):
+    """Every obtainable evaluation corpus ships pre-cropped Mouth Regions, so
+    the mode exists to stop the CLI cropping a face out of a mouth."""
+    without = run_cli(str(faceless_clip), "--checkpoint", "/dev/null")
+    assert without.returncode == 1  # no face to find
+
+    with_flag = run_cli(str(faceless_clip), "--checkpoint", "/dev/null", "--pre-cropped")
+    assert with_flag.returncode == 3  # got past extraction, failed on the checkpoint
+
+
+@needs_upstream
+@needs_face_clip
+def test_several_clips_load_the_checkpoint_once():
+    """A per-Clip invocation would reload 4 GB for every Clip in a corpus."""
+    result = run_cli(FACE_CLIP, FACE_CLIP, "--checkpoint", CHECKPOINT, "--json")
+    assert result.returncode == 0, result.stderr
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    assert len(lines) == 2, "expected one JSON object per Clip"
+    for line in lines:
+        assert json.loads(line)["transcript"]

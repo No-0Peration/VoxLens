@@ -13,6 +13,7 @@ import time
 
 from voxlens.devices import DEFAULT_DEVICE, resolve_device
 from voxlens.extraction import MouthRegionError, extract_mouth_regions
+from voxlens.extraction import PreCroppedRegions
 from voxlens.occlusion import DEFAULT_MIN_FRAMES, find_occlusions
 from voxlens.result import Result, Timing, checkpoint_identity
 from voxlens.video import UnreadableClipError, decode_clip
@@ -42,7 +43,13 @@ def build_parser() -> argparse.ArgumentParser:
         ),
         formatter_class=argparse.RawDescriptionHelpFormatter,
     )
-    parser.add_argument("video", help="path to a video file holding one Clip")
+    parser.add_argument(
+        "video",
+        nargs="+",
+        help="one or more video files, each holding one Clip. With several, the "
+        "checkpoint is loaded once and --json emits one JSON object per line "
+        "(JSON Lines) — which is what makes evaluating a corpus viable.",
+    )
     parser.add_argument(
         "--checkpoint",
         required=True,
@@ -61,6 +68,13 @@ def build_parser() -> argparse.ArgumentParser:
         dest="as_json",
         help="emit machine-readable output on stdout; the evaluation harness "
         "consumes this, so nothing else may reach stdout",
+    )
+    parser.add_argument(
+        "--pre-cropped",
+        action="store_true",
+        help="the input Frames are ALREADY Mouth Region crops, so skip face "
+        "detection. Every obtainable evaluation corpus ships this way. No "
+        "Occlusion can be reported in this mode — there is no face to lose.",
     )
     parser.add_argument(
         "--occlusion-min-frames",
@@ -90,65 +104,90 @@ def main(argv: list[str] | None = None) -> int:
         print(f"voxlens: {exc}", file=sys.stderr)
         return EXIT_BAD_INPUT
 
-    try:
-        clip = decode_clip(args.video)
-    except UnreadableClipError as exc:
-        print(f"voxlens: {exc}", file=sys.stderr)
-        return EXIT_BAD_INPUT
-
-    started = time.perf_counter()
-    try:
-        regions = extract_mouth_regions(clip.frames)
-    except MouthRegionError as exc:
-        print(f"voxlens: {exc}", file=sys.stderr)
-        return EXIT_UNREADABLE
-    extract_s = time.perf_counter() - started
-
-    # Imported here so that the failures above do not pay for loading torch.
     from voxlens.recogniser import CheckpointError, load_recogniser
 
-    try:
-        recogniser = load_recogniser(args.checkpoint, plan, beam=args.beam)
-    except CheckpointError as exc:
-        # Only the known checkpoint failures map to an exit code; a genuine bug
-        # must still surface as a traceback rather than a tidy error message.
-        print(f"voxlens: {exc}", file=sys.stderr)
-        return EXIT_MODEL
+    # Loaded once, on the first Clip that actually needs it. Eagerly would make
+    # a broken checkpoint preempt a missing file, so `voxlens missing.mp4` would
+    # complain about the wrong thing; lazily would reload 4 GB per Clip.
+    loaded: list = []
 
-    started = time.perf_counter()
-    transcript = recogniser.transcribe(regions.crops)
-    infer_s = time.perf_counter() - started
+    def recogniser_for_use():
+        if not loaded:
+            loaded.append(load_recogniser(args.checkpoint, plan, beam=args.beam))
+        return loaded[0]
 
-    occlusions = find_occlusions(
-        regions.undetected, min_frames=args.occlusion_min_frames
-    )
+    checkpoint = checkpoint_identity(args.checkpoint)
+    worst = EXIT_OK
+    many = len(args.video) > 1
 
-    result = Result(
-        video=args.video,
-        frames=clip.frame_count,
-        fps=clip.fps,
-        duration_s=clip.duration_s,
-        transcript=transcript,
-        undetected_frames=regions.undetected_count,
-        timing=Timing(extract_s=extract_s, infer_s=infer_s, duration_s=clip.duration_s),
-        device=plan.name,
-        beam=args.beam,
-        occlusion_min_frames=args.occlusion_min_frames,
-        occlusions=tuple(occlusions),
-        checkpoint=checkpoint_identity(args.checkpoint),
-    )
+    for path in args.video:
+        try:
+            clip = decode_clip(path)
+        except UnreadableClipError as exc:
+            print(f"voxlens: {exc}", file=sys.stderr)
+            worst = max(worst, EXIT_BAD_INPUT)
+            continue
 
-    if args.as_json:
-        json.dump(result.as_dict(), sys.stdout, indent=2)
-        sys.stdout.write("\n")
-    else:
-        print(result.transcript)
+        started = time.perf_counter()
+        if args.pre_cropped:
+            # The Frames are the Mouth Region already. Running a face detector
+            # over a mouth crop finds nothing — or worse, finds something and
+            # crops a "face" out of a mouth, silently producing garbage.
+            regions = PreCroppedRegions(clip.frames)
+        else:
+            try:
+                regions = extract_mouth_regions(clip.frames)
+            except MouthRegionError as exc:
+                print(f"voxlens: {path}: {exc}", file=sys.stderr)
+                worst = max(worst, EXIT_UNREADABLE)
+                continue
+        extract_s = time.perf_counter() - started
 
-    # Diagnostics never touch stdout, in either mode: --json must stay pipeable.
-    print(result.summary_line(), file=sys.stderr)
-    for line in result.occlusion_lines():
-        print(line, file=sys.stderr)
-    return EXIT_OK
+        try:
+            recogniser = recogniser_for_use()
+        except CheckpointError as exc:
+            # Only the known checkpoint failures map to an exit code; a genuine
+            # bug must still surface as a traceback, not a tidy message.
+            print(f"voxlens: {exc}", file=sys.stderr)
+            return EXIT_MODEL
+
+        started = time.perf_counter()
+        transcript = recogniser.transcribe(regions.crops)
+        infer_s = time.perf_counter() - started
+
+        result = Result(
+            video=path,
+            frames=clip.frame_count,
+            fps=clip.fps,
+            duration_s=clip.duration_s,
+            transcript=transcript,
+            undetected_frames=regions.undetected_count,
+            timing=Timing(extract_s=extract_s, infer_s=infer_s, duration_s=clip.duration_s),
+            device=plan.name,
+            beam=args.beam,
+            occlusion_min_frames=args.occlusion_min_frames,
+            occlusions=tuple(
+                find_occlusions(regions.undetected, min_frames=args.occlusion_min_frames)
+            ),
+            checkpoint=checkpoint,
+        )
+
+        if args.as_json:
+            # One object per line when there are several Clips, so a consumer
+            # can stream rather than wait for the whole corpus.
+            json.dump(result.as_dict(), sys.stdout, indent=None if many else 2)
+            sys.stdout.write("\n")
+        elif many:
+            print(f"{path}\t{result.transcript}")
+        else:
+            print(result.transcript)
+
+        # Diagnostics never touch stdout, in either mode: --json stays pipeable.
+        print(result.summary_line(), file=sys.stderr)
+        for line in result.occlusion_lines():
+            print(line, file=sys.stderr)
+
+    return worst
 
 
 if __name__ == "__main__":
