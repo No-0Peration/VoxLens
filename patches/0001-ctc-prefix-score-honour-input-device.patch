@@ -1,0 +1,19 @@
+diff --git a/espnet/nets/ctc_prefix_score.py b/espnet/nets/ctc_prefix_score.py
+index 0c67ecd..d5d0c8b 100755
+--- a/espnet/nets/ctc_prefix_score.py
++++ b/espnet/nets/ctc_prefix_score.py
+@@ -38,11 +38,9 @@ class CTCPrefixScoreTH(object):
+         self.input_length = x.size(1)
+         self.odim = x.size(2)
+         self.dtype = x.dtype
+-        self.device = (
+-            torch.device("cuda:%d" % x.get_device())
+-            if x.is_cuda
+-            else torch.device("cpu")
+-        )
++        # VoxLens patch (#4/#7): upstream hardcodes cuda-or-cpu, which silently
++        # resolves to cpu on Apple Silicon and then fails with a device mismatch.
++        self.device = x.device
+         # Pad the rest of posteriors in the batch
+         # TODO(takaaki-hori): need a better way without for-loops
+         for i, l in enumerate(xlens):

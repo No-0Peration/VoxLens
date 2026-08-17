@@ -1,0 +1,49 @@
+diff --git a/demo.py b/demo.py
+index 2f598dd..8b26d3e 100644
+--- a/demo.py
++++ b/demo.py
+@@ -58,7 +58,27 @@ def load_video_audio(path: str, target_fps: int = 25, target_sr: int = 16000):
+     import os
+     if not os.path.exists(path):
+         raise FileNotFoundError(f"Video file not found: {path}")
+-    video, audio, info = torchvision.io.read_video(path, pts_unit="sec")
++    # torchvision.io.read_video was removed in torchvision 0.28. Decode the
++    # video with OpenCV (already a dependency) and read audio with torchaudio.
++    import cv2 as _cv2
++    _cap = _cv2.VideoCapture(path)
++    _frames = []
++    while True:
++        _ok, _f = _cap.read()
++        if not _ok:
++            break
++        _frames.append(_cv2.cvtColor(_f, _cv2.COLOR_BGR2RGB))
++    _src_fps = _cap.get(_cv2.CAP_PROP_FPS) or target_fps
++    _cap.release()
++    if not _frames:
++        raise RuntimeError(f"No decodable video frames in: {path}")
++    import numpy as _np
++    video = torch.from_numpy(_np.stack(_frames))
++    try:
++        audio, _sr = torchaudio.load(path)
++    except Exception:
++        audio, _sr = torch.zeros(1, 0), target_sr
++    info = {"video_fps": _src_fps, "audio_fps": _sr}
+     # video: (T, H, W, C) uint8   audio: (C, S) float
+ 
+     # --- audio ---------------------------------------------------------------
+@@ -281,7 +301,14 @@ def main(cfg: DictConfig):
+ 
+     detector = cfg.get("detector", "mediapipe")
+ 
+-    device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
++    # Apple Silicon: prefer the GPU. Upstream only ever selected cuda or cpu,
++    # so MPS machines silently fell back to cpu.
++    if torch.cuda.is_available():
++        device = torch.device("cuda")
++    elif torch.backends.mps.is_available():
++        device = torch.device("mps")
++    else:
++        device = torch.device("cpu")
+     text = transcribe(video_path, cfg, modality=modality, device=device,
+                       detector=detector)
+     print(f"\n{'='*60}")

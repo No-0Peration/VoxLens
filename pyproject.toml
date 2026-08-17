@@ -1,0 +1,43 @@
+[project]
+name = "voxlens"
+version = "0.1.0"
+description = "Read speech from the visible movement of a speaker's mouth, without audio."
+requires-python = ">=3.11,<3.13"
+
+dependencies = [
+    # Apple Silicon only ships arm64 wheels; see docs/setup.md if resolution fails.
+    "torch>=2.13,<2.14",
+    # torchaudio's version line diverged from torch's: 2.11.0 is what
+    # pairs with torch 2.13.
+    "torchaudio>=2.11,<2.12",
+    "torchvision>=0.28,<0.29",
+    "pytorch-lightning>=2.0",
+    "hydra-core>=1.3",
+    "omegaconf>=2.3",
+    "opencv-python>=4.10",
+    "numpy>=1.26",
+    "sentencepiece>=0.2",
+    "av>=12",
+    "tqdm>=4.66",
+    # PINNED, NOT A RANGE. mediapipe 1.0.1 aborts fatally on macOS 26 / Apple
+    # Silicon inside its Metal path (DrishtiMetalHelper, "Check failed:
+    # service_ Service is unavailable"). It is a process kill, not a catchable
+    # exception, and forcing the CPU delegate does NOT avoid it. Do not bump
+    # without re-running tests/test_smoke.py end to end. See VoxLens issue #9.
+    "mediapipe==0.10.35",
+]
+
+[dependency-groups]
+dev = ["pytest>=8.0"]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/voxlens"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+pythonpath = ["src"]
+filterwarnings = ["ignore::UserWarning"]
