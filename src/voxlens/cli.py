@@ -7,11 +7,13 @@ holds no recognition logic of its own.
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 import time
 
 from voxlens.devices import DEFAULT_DEVICE, resolve_device
 from voxlens.extraction import MouthRegionError, extract_mouth_regions
+from voxlens.result import Result, Timing, checkpoint_identity
 from voxlens.video import UnreadableClipError, decode_clip
 
 __all__ = ["main"]
@@ -40,6 +42,13 @@ def build_parser() -> argparse.ArgumentParser:
         choices=["hybrid", "mps", "cpu"],
         help="hybrid runs the encoder on the GPU and the search on the CPU, "
         "which is the fastest measured configuration (default: %(default)s)",
+    )
+    parser.add_argument(
+        "--json",
+        action="store_true",
+        dest="as_json",
+        help="emit machine-readable output on stdout; the evaluation harness "
+        "consumes this, so nothing else may reach stdout",
     )
     parser.add_argument(
         "--beam",
@@ -87,14 +96,27 @@ def main(argv: list[str] | None = None) -> int:
     transcript = recogniser.transcribe(regions.crops)
     infer_s = time.perf_counter() - started
 
-    print(transcript)
-
-    rtf = (extract_s + infer_s) / clip.duration_s if clip.duration_s else float("nan")
-    print(
-        f"{clip.frame_count} frames, {clip.duration_s:.1f}s, RTF {rtf:.2f}"
-        f"  |  {regions.undetected_count} frame(s) with no detected face",
-        file=sys.stderr,
+    result = Result(
+        video=args.video,
+        frames=clip.frame_count,
+        fps=clip.fps,
+        duration_s=clip.duration_s,
+        transcript=transcript,
+        undetected_frames=regions.undetected_count,
+        timing=Timing(extract_s=extract_s, infer_s=infer_s, duration_s=clip.duration_s),
+        device=plan.name,
+        beam=args.beam,
+        checkpoint=checkpoint_identity(args.checkpoint),
     )
+
+    if args.as_json:
+        json.dump(result.as_dict(), sys.stdout, indent=2)
+        sys.stdout.write("\n")
+    else:
+        print(result.transcript)
+
+    # Diagnostics never touch stdout, in either mode: --json must stay pipeable.
+    print(result.summary_line(), file=sys.stderr)
     return EXIT_OK
 
 

@@ -6,6 +6,7 @@ ever loaded, so the failure paths are cheap to cover.
 """
 from __future__ import annotations
 
+import json
 import os
 import subprocess
 import sys
@@ -103,3 +104,59 @@ def test_every_device_produces_the_same_transcript():
         assert result.returncode == 0, result.stderr
         transcripts[device] = result.stdout.strip()
     assert transcripts["cpu"] == transcripts["hybrid"]
+
+
+@needs_upstream
+@needs_face_clip
+def test_json_mode_puts_only_the_payload_on_stdout():
+    result = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json")
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)  # would raise if anything else leaked
+    assert payload["transcript"]
+    assert payload["frames"] > 0
+
+
+@needs_upstream
+@needs_face_clip
+def test_json_payload_records_what_produced_it():
+    """A result has to be reproducible from its own output."""
+    result = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json", "--beam", "1")
+    payload = json.loads(result.stdout)
+    config = payload["config"]
+    assert config["beam"] == 1
+    assert config["device"] in ("hybrid", "mps", "cpu")
+    assert config["checkpoint"]["path"].endswith(".pth")
+    assert config["checkpoint"]["size_bytes"] > 0
+
+
+@needs_upstream
+@needs_face_clip
+def test_json_payload_separates_extraction_from_inference():
+    """Extraction is the largest component; hiding it inside one total would
+    conceal the thing most worth watching."""
+    payload = json.loads(run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json").stdout)
+    timing = payload["timing"]
+    assert timing["extract_s"] > 0
+    assert timing["infer_s"] > 0
+    assert timing["rtf"] > 0
+    assert timing["total_s"] == pytest.approx(
+        timing["extract_s"] + timing["infer_s"], abs=0.01
+    )
+
+
+@needs_upstream
+@needs_face_clip
+def test_diagnostics_stay_on_stderr_in_both_modes():
+    for extra in ([], ["--json"]):
+        result = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, *extra)
+        assert "RTF" in result.stderr
+        assert "RTF" not in result.stdout
+
+
+@needs_upstream
+@needs_face_clip
+def test_human_mode_still_prints_a_bare_transcript():
+    """--json is additive; the default output is unchanged."""
+    plain = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT)
+    payload = json.loads(run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json").stdout)
+    assert plain.stdout.strip() == payload["transcript"]
