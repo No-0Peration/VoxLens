@@ -14,6 +14,8 @@ The distribution matters more than the average: **415 of 1,321 clips are read ex
 
 Not built: real-time streaming (Clips only, per [ADR-0001](docs/adr/0001-clips-first-streaming-target.md)), and filling Occlusions with inferred text — gaps are reported, never invented.
 
+Designed but not built: [live capture](docs/live-capture.md), where a phone is the camera and a Mac runs the recogniser.
+
 ## Repository layout
 
 ```
@@ -34,6 +36,7 @@ Not built: real-time streaming (Clips only, per [ADR-0001](docs/adr/0001-clips-f
     ├── demo.html           ← what the model reads, against what was said
     ├── demo.pdf            ← the same page, for reading offline
     ├── architecture.md     ← system shape and module boundaries
+    ├── live-capture.md     ← designed, not built: phone as camera
     ├── adr/               ← architecture decision records
     ├── research/          ← primary-source findings behind the decisions
     │   └── README.md       ← start here for the research
