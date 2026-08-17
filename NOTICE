@@ -1,0 +1,77 @@
+VoxLens — third-party components and their terms
+================================================
+
+VoxLens's own code and documentation are licensed under the PolyForm
+Noncommercial License 1.0.0 (see LICENSE). Nothing in that licence grants rights
+in anything listed below. Each carries its own terms, and several are more
+restrictive than VoxLens's licence.
+
+Nothing listed here is committed to this repository — no model weights, no
+corpus data, no vendored upstream source. They are fetched at setup time or
+supplied by you.
+
+
+The recogniser
+--------------
+
+USR 2.0 — https://github.com/ahaliassos/usr2
+    CC BY-NC 4.0, covering both the code and the released weights.
+    Copyright (c) 2026 Alexandros Haliassos.
+
+    Fetched at a pinned revision by scripts/vendor.py into vendor/, which is
+    generated and not committed. The files in patches/ are diffs against that
+    source and therefore contain short excerpts of it.
+
+    The weights are NOT distributed with VoxLens and are never downloaded
+    automatically. You obtain them yourself, under their terms.
+
+    Note that the underlying training data (LRS3, TED-derived) is CC BY-NC-ND,
+    which is why no commercially-usable visual speech recognition checkpoint
+    was found to exist. See docs/research/pretrained-checkpoints.md.
+
+
+Runtime dependencies
+--------------------
+
+MediaPipe — https://github.com/google-ai-edge/mediapipe
+    Apache License 2.0. Used for face and landmark detection. The bundled
+    face_landmarker.task model carries Google's own model terms.
+
+PyTorch, torchvision, torchaudio — https://pytorch.org
+    BSD-3-Clause.
+
+OpenCV (opencv-python) — https://opencv.org
+    Apache License 2.0.
+
+PyTorch Lightning, Hydra, OmegaConf, NumPy, tqdm, sentencepiece, PyAV
+    Apache-2.0 or BSD-style; see each project for its terms.
+
+
+Evaluation corpora
+------------------
+
+Not distributed with VoxLens, and not committed. Obtained by you, under their
+own terms, which are more restrictive than this project's licence.
+
+LRS3 (via the MuAViC re-host)
+    TED-derived, CC BY-NC-ND. Withdrawn from its original distribution points.
+    Evaluation use only.
+
+WildVSR — https://github.com/YasserdahouML/VSR_test_set
+    No licence text is published. The repository has no LICENSE file and the
+    README states no terms. Treat as unlicensed: fine for private local
+    evaluation, not a basis for redistribution.
+
+Excerpts
+    docs/demo.html and docs/demo.pdf quote a small number of short transcript
+    lines from the LRS3 test split, for the purpose of illustrating and
+    criticising the system's output.
+
+
+If you are considering commercial use
+-------------------------------------
+
+VoxLens's own licence forbids it, and relicensing that alone would not be
+enough: the recogniser, its weights, and the data lineage behind them each
+prohibit commercial use independently. See docs/adr/0003-usr2-large-non-commercial.md
+for the full chain.

@@ -19,6 +19,8 @@ Not built: real-time streaming (Clips only, per [ADR-0001](docs/adr/0001-clips-f
 ```
 /
 ├── README.md
+├── LICENSE                ← PolyForm Noncommercial 1.0.0
+├── NOTICE                 ← third-party terms, incl. the weights and corpora
 ├── CONTEXT.md             ← the domain glossary
 ├── AGENTS.md              ← conventions for agents working in this repo
 ├── pyproject.toml
@@ -86,3 +88,11 @@ voxlens interview.mp4 --checkpoint "$VOXLENS_CHECKPOINT"
 [`docs/usage.md`](docs/usage.md) covers the rest — JSON output, batch runs, exit codes, and scoring against a corpus.
 
 If you are on a Mac migrated from Intel hardware, read the last section of the setup doc before anything else. That failure mode produces no error message pointing at its cause.
+
+## Licence
+
+VoxLens is licensed under the [PolyForm Noncommercial License 1.0.0](LICENSE) — use, modify and share it freely for any noncommercial purpose.
+
+It could not be permissive even if that were wanted. The recogniser it builds on is CC BY-NC 4.0 covering code and weights, and the data lineage behind those weights is CC BY-NC-ND, so no commercially-usable path exists through this pipeline at all. [ADR-0003](docs/adr/0003-usr2-large-non-commercial.md) records the chain; [NOTICE](NOTICE) lists every third-party component and its terms.
+
+Model weights and evaluation corpora are **not** distributed here and are never downloaded for you. You obtain them yourself, under their own terms.
