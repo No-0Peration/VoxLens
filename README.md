@@ -6,9 +6,13 @@ The goal is to explore practical, real-time lip-reading using modern AI and visi
 
 ## Status
 
-Early and experimental. The recognition stack is chosen and measured, and the environment builds; the CLI that turns a Clip into a Transcript is not written yet.
+Working, and honest about its limits. `voxlens` turns a video Clip into a Transcript, marks the stretches where the Speaker's mouth could not be read, and `voxlens-eval` scores the whole thing against a corpus.
 
-Where it stands, measured on an M4 Pro: **34.2% WER** on the LRS3 test split and **47.9%** on a WildVSR sample, end-to-end at **RTF 0.29** — roughly 3.4× faster than real time. Around half the words are wrong on real-world video, which is close to the state of the art for audio-free lip reading.
+Measured on an M4 Pro over the full 1,321-clip LRS3 test split: **34.3% WER**, and **47.9%** on a WildVSR sample — roughly every other word wrong on real-world video, which is close to the state of the art for audio-free lip reading. End to end it runs at **RTF 0.29**, about 3.4× faster than real time.
+
+The distribution matters more than the average: **415 of 1,321 clips are read exactly right**, while 193 come out worse than 100% word errors. It tends to nail a Clip or lose it, rather than being uniformly mediocre. See [`docs/demo.html`](docs/demo.html).
+
+Not built: real-time streaming (Clips only, per [ADR-0001](docs/adr/0001-clips-first-streaming-target.md)), and filling Occlusions with inferred text — gaps are reported, never invented.
 
 ## Repository layout
 
