@@ -71,9 +71,14 @@ compressed. This puts zoom, tracking and hand-shake on the phone where they belo
 and leaves the Mac doing exactly what it already does: crops in, text out, the same
 interface as `--pre-cropped`.
 
-The Mac side of that is the one part now built: `voxlens-serve` holds the checkpoint
-and answers sessions of crops, and `voxlens-replay` drives it from a file so the
-transport could be finished and tested before any Swift existed.
+The Mac side of that is built: `voxlens-serve` holds the checkpoint and answers
+sessions of crops, and `voxlens-replay` drives it from a file so the transport could
+be finished and tested before any Swift existed.
+
+The phone side now has its wire, too — [`swift/VoxLensTransport`](../swift/VoxLensTransport/README.md),
+verified against a live server on the real checkpoint in both session modes. What it
+does not have is anything to do with a camera: tap-to-lock, on-device extraction and
+lens selection all need Xcode and a device.
 
 On-device inference is an optimisation for later, not a precondition. The checkpoint
 is 4 GB and Core ML conversion is a project of its own; doing it first would delay
