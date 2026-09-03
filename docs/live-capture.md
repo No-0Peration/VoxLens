@@ -113,6 +113,10 @@ does the camera path add on top of the 48% the model already costs? If the answe
 "48% becomes 75%", it changes what is worth building. It needs a monitor, a tripod and
 an afternoon — no Swift at all.
 
+The procedure and the scoring path are written down in
+[camera-path-measurement.md](camera-path-measurement.md), including the results table
+to fill in. Nothing has been filmed yet; that document is a plan, not a finding.
+
 **Then record crops for later scoring**, opt-in, so real sessions can be reviewed
 rather than judged by impression.
 
