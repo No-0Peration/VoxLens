@@ -7,6 +7,9 @@
 #   CHECKPOINT  the USR 2.0 Large .pth
 #   CORPUS      directory holding the corpus (see docs/setup.md)
 #   CLIP        a video with a real face, for the Occlusion section
+#
+#   make confidence           the ADR-0011 measurement; needs CHECKPOINT and
+#                             CORPUS only, and no CLIP
 
 CHECKPOINT ?= $(VOXLENS_CHECKPOINT)
 CORPUS     ?= $(VOXLENS_CORPUS)
@@ -15,12 +18,23 @@ STRIDE     ?= 1
 PY         ?= .venv/bin/python
 CHROME     ?= /Applications/Google Chrome.app/Contents/MacOS/Google Chrome
 
-.PHONY: demo demo-pdf check-inputs
+.PHONY: demo demo-pdf check-inputs check-corpus confidence
 
 check-inputs:
 	@test -n "$(CHECKPOINT)" || { echo "set CHECKPOINT (or VOXLENS_CHECKPOINT)"; exit 2; }
 	@test -n "$(CORPUS)"     || { echo "set CORPUS (or VOXLENS_CORPUS)"; exit 2; }
 	@test -n "$(CLIP)"       || { echo "set CLIP (or VOXLENS_TEST_CLIP)"; exit 2; }
+
+check-corpus:
+	@test -n "$(CHECKPOINT)" || { echo "set CHECKPOINT (or VOXLENS_CHECKPOINT)"; exit 2; }
+	@test -n "$(CORPUS)"     || { echo "set CORPUS (or VOXLENS_CORPUS)"; exit 2; }
+
+# Does divergence between the CTC and beam decoders predict being wrong?
+# ADR-0011 requires this answered before divergence is presented as
+# confidence. Read spearman and the buckets, then record the decision there.
+confidence: check-corpus
+	$(PY) -m voxlens.evaluate "$(CORPUS)" --corpus lrs3 --checkpoint "$(CHECKPOINT)" \
+	  --divergence --stride $(STRIDE) --out .confidence-results.json
 
 demo: check-inputs
 	$(PY) -m voxlens.evaluate "$(CORPUS)" --corpus lrs3 --checkpoint "$(CHECKPOINT)" \

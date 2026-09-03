@@ -11,6 +11,7 @@ import json
 import sys
 import time
 
+from voxlens.confidence import divergence
 from voxlens.devices import DEFAULT_DEVICE, resolve_device
 from voxlens.extraction import MouthRegionError, extract_mouth_regions
 from voxlens.extraction import PreCroppedRegions
@@ -86,6 +87,15 @@ def build_parser() -> argparse.ArgumentParser:
         "one viseme (default: %(default)s)",
     )
     parser.add_argument(
+        "--divergence",
+        action="store_true",
+        help="also read the Clip with the CTC head and report how far the two "
+        "decoders disagree. A measurement, not a confidence: whether "
+        "disagreement predicts being wrong is what ADR-0011 requires "
+        "measuring, and this flag is how the harness measures it. Roughly "
+        "doubles decode cost.",
+    )
+    parser.add_argument(
         "--beam",
         type=int,
         default=1,
@@ -152,7 +162,17 @@ def main(argv: list[str] | None = None) -> int:
             return EXIT_MODEL
 
         started = time.perf_counter()
-        transcript = recogniser.transcribe(regions.crops)
+        if args.divergence:
+            # One encode, two decodes. Both readings must come from the same
+            # encoder output or their disagreement would be about two
+            # encodings rather than about one (ADR-0011).
+            encoded = recogniser.encode(regions.crops)
+            transcript = recogniser.decode(encoded)
+            ctc_transcript = recogniser.decode_ctc(encoded)
+            disagreement = divergence(transcript, ctc_transcript)
+        else:
+            transcript = recogniser.transcribe(regions.crops)
+            ctc_transcript = disagreement = None
         infer_s = time.perf_counter() - started
 
         result = Result(
@@ -170,6 +190,8 @@ def main(argv: list[str] | None = None) -> int:
                 find_occlusions(regions.undetected, min_frames=args.occlusion_min_frames)
             ),
             checkpoint=checkpoint,
+            divergence=disagreement,
+            ctc_transcript=ctc_transcript,
         )
 
         if args.as_json:
@@ -184,6 +206,8 @@ def main(argv: list[str] | None = None) -> int:
 
         # Diagnostics never touch stdout, in either mode: --json stays pipeable.
         print(result.summary_line(), file=sys.stderr)
+        if line := result.divergence_line():
+            print(line, file=sys.stderr)
         for line in result.occlusion_lines():
             print(line, file=sys.stderr)
 

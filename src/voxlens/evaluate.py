@@ -64,6 +64,9 @@ class ClipScore:
     words: int
     duration_s: float
     rtf: float
+    # Present only under --divergence: how far the CTC head's reading of this
+    # Clip was from the beam search's (ADR-0011).
+    divergence: float | None = None
 
 
 def load_corpus(root: Path, kind: str, stride: int = 1, limit: int | None = None):
@@ -95,7 +98,14 @@ def load_corpus(root: Path, kind: str, stride: int = 1, limit: int | None = None
     return pairs[:limit] if limit else pairs
 
 
-def evaluate(pairs, checkpoint: Path, device: str, beam: int, voxlens: list[str]):
+def evaluate(
+    pairs,
+    checkpoint: Path,
+    device: str,
+    beam: int,
+    voxlens: list[str],
+    with_divergence: bool = False,
+):
     """Run the CLI over every Clip and score the results."""
     command = [
         *voxlens,
@@ -107,6 +117,7 @@ def evaluate(pairs, checkpoint: Path, device: str, beam: int, voxlens: list[str]
         # Every obtainable corpus ships pre-cropped Mouth Regions (ADR-0005).
         # Running face detection over them would crop a face out of a mouth.
         "--pre-cropped",
+        *(["--divergence"] if with_divergence else []),
     ]
     process = subprocess.run(command, capture_output=True, text=True)
     if not process.stdout.strip():
@@ -136,6 +147,7 @@ def evaluate(pairs, checkpoint: Path, device: str, beam: int, voxlens: list[str]
                 words=words,
                 duration_s=payload["duration_s"],
                 rtf=payload["timing"]["rtf"],
+                divergence=payload.get("divergence", {}).get("value"),
             )
         )
     return scores, process.returncode
@@ -153,6 +165,14 @@ def main(argv: list[str] | None = None) -> int:
     parser.add_argument("--beam", type=int, default=1)
     parser.add_argument("--stride", type=int, default=1, help="sample every Nth Clip")
     parser.add_argument("--limit", type=int, default=None)
+    parser.add_argument(
+        "--divergence",
+        action="store_true",
+        help="also read every Clip with the CTC head and report how divergence "
+        "between the two decoders correlates with measured per-Clip WER. This "
+        "is the evidence ADR-0011 requires before divergence may be presented "
+        "as confidence. Roughly doubles decode cost.",
+    )
     parser.add_argument("--out", help="write per-Clip results as JSON here")
     args = parser.parse_args(argv)
 
@@ -165,6 +185,7 @@ def main(argv: list[str] | None = None) -> int:
     scores, exit_code = evaluate(
         pairs, Path(args.checkpoint), args.device, args.beam,
         voxlens=[sys.executable, "-m", "voxlens.cli"],
+        with_divergence=args.divergence,
     )
     if not scores:
         print("voxlens-eval: no Clip produced a Transcript", file=sys.stderr)
@@ -188,6 +209,29 @@ def main(argv: list[str] | None = None) -> int:
         "rtf": round(weighted_rtf, 3),
         "config": {"device": args.device, "beam": args.beam, "stride": args.stride},
     }
+
+    if args.divergence:
+        # Imported here rather than at module scope: voxlens.confidence reuses
+        # this module's WER as its edit distance, so either import at the top
+        # would be a cycle.
+        from voxlens.confidence import correlate
+
+        measured = [
+            (score.divergence, score.errors / score.words)
+            for score in scores
+            # A Clip whose reference has no words has no WER to correlate
+            # against, and a Clip the CLI could not read has no divergence.
+            if score.divergence is not None and score.words
+        ]
+        summary["divergence"] = correlate(
+            [value for value, _ in measured], [rate for _, rate in measured]
+        )
+        summary["divergence"]["calibrated"] = False
+        print(
+            "divergence measured against per-Clip WER — read spearman and the "
+            "buckets, then record the decision in ADR-0011",
+            file=sys.stderr,
+        )
     json.dump(summary, sys.stdout, indent=2)
     sys.stdout.write("\n")
 

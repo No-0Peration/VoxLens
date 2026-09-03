@@ -56,6 +56,7 @@ Two things in that diagram carry most of the design.
 | occlusion | Detection mask → spans (pure function) | Detecting anything itself |
 | CLI | Argument surface, orchestration, rendering, exit codes | Any recognition logic |
 | harness | Running the CLI over a corpus, scoring | Reaching into internals |
+| `voxlens.confidence` | Divergence between the two decoders, and whether it tracks WER (pure) | Deciding whether it is trustworthy — that is a measurement |
 | `voxlens.transport` | The wire for live capture: message framing, the crop contract on it, and the client that stands in for a phone | Recognition, cameras, sessions |
 | server | Sessions, one loaded recogniser, serialising inference across cameras | Extraction — the camera did that |
 
@@ -111,5 +112,5 @@ exists:
 | --- | --- | --- |
 | [0009](adr/0009-phone-is-a-camera-not-the-model-host.md) | The phone is a camera, not the model host | proposed — Mac half built (#19) |
 | [0010](adr/0010-read-on-screen-never-aloud.md) | Read on screen, never aloud | proposed |
-| [0011](adr/0011-confidence-from-decoder-disagreement.md) | Confidence from decoder disagreement | proposed |
+| [0011](adr/0011-confidence-from-decoder-disagreement.md) | Confidence from decoder disagreement | proposed — measured, not adopted (#22) |
 | [0012](adr/0012-windowed-decoding-not-true-streaming.md) | Windowed decoding, not true streaming | proposed |

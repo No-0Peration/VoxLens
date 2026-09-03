@@ -43,8 +43,10 @@ needs_crop_clip = pytest.mark.skipif(
         and os.path.exists(CHECKPOINT)
         and os.path.exists(CROP_CLIP)
     ),
-    reason="set VOXLENS_CHECKPOINT and VOXLENS_CROP_CLIP (a pre-cropped 96x96 "
-    "Mouth Region clip, as evaluation corpora ship) to run this",
+    reason="set VOXLENS_CHECKPOINT and VOXLENS_CROP_CLIP to run this. The crop "
+    "clip is 96x96 Mouth Regions, as evaluation corpora ship — make one with "
+    "scripts/make_crop_clip.py, synthetically if need be: this test is about "
+    "two routes agreeing, not about speech",
 )
 
 STUB_CHECKPOINT = {"path": "/stub/usr2_large.pth", "size_bytes": 1}

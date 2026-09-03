@@ -19,3 +19,6 @@ outputs/
 # Intermediates from `make demo`.
 .demo-results.json
 .demo-occlusion.json
+
+# Intermediates from `make confidence`.
+.confidence-results.json

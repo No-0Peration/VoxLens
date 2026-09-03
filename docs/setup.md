@@ -12,14 +12,34 @@ uv run python scripts/vendor.py
 uv run pytest
 ```
 
-That should end with tests passing and one or two skips. The skips are expected —
-they are the tests that need a checkpoint.
+That should end with tests passing and a set of skips. The skips are expected —
+they are the tests that need a checkpoint, or a Clip to point it at.
 
 To run the full smoke test, point at a checkpoint you have obtained yourself:
 
 ```bash
 VOXLENS_CHECKPOINT=/path/to/usr2_large.pth uv run pytest
 ```
+
+Three fixtures unlock the rest, and only the first needs real speech:
+
+| Variable | What it is |
+| --- | --- |
+| `VOXLENS_CHECKPOINT` | the USR 2.0 Large `.pth` — see below |
+| `VOXLENS_TEST_CLIP` | any video with a visible, talking face |
+| `VOXLENS_CROP_CLIP` | a clip of **96×96 Mouth Regions**, as corpora ship |
+
+The last one you can make, since corpora are gated or no longer distributed:
+
+```bash
+uv run python scripts/make_crop_clip.py face.mp4 --out mouth96.mp4
+uv run python scripts/make_crop_clip.py --synthetic 60 --out plumbing96.mp4
+```
+
+The synthetic form carries no mouth, so any Transcript from it is meaningless —
+but it is enough for the test that matters to the crop transport: that
+`voxlens-serve` and `voxlens --pre-cropped` return identical text for identical
+input. That claim is about the seam, not about speech.
 
 ## The checkpoint
 

@@ -15,7 +15,7 @@ import torch
 from voxlens.devices import DevicePlan
 from voxlens.upstream import BACKBONE, ensure_importable, load_config, vendored_path
 
-__all__ = ["CheckpointError", "Recogniser", "load_recogniser"]
+__all__ = ["CheckpointError", "Recogniser", "collapse_ctc", "load_recogniser"]
 
 
 class CheckpointError(RuntimeError):
@@ -25,11 +25,46 @@ class CheckpointError(RuntimeError):
     programming errors, which must still surface as tracebacks.
     """
 
+# CTC reserves index 0 for the blank label, which is what makes a greedy
+# reading possible: collapse repeats, then drop blanks.
+CTC_BLANK = 0
+
 # The crop contract the checkpoint was trained against. Changing any of these
 # silently degrades accuracy rather than failing, so they are stated once.
 CROP = 88
 NORM_MEAN = 0.421
 NORM_STD = 0.165
+
+
+def collapse_ctc(ids) -> list[int]:
+    """Frame-wise argmax ids to a token sequence, by the CTC rule.
+
+    Collapse runs of the same id, then drop blanks — in that order, because a
+    blank between two identical ids is what marks them as two genuine tokens
+    rather than one held across Frames. Reversing it would silently merge
+    doubled words.
+
+    Pure, and a seam of its own for the reason ADR-0007 gives: the rule has
+    exactly the edge cases that are painful to provoke through a 4 GB model.
+    """
+    collapsed = []
+    previous = None
+    for token_id in ids:
+        if token_id != previous and token_id != CTC_BLANK:
+            collapsed.append(token_id)
+        previous = token_id
+    return collapsed
+
+
+def _text_from_tokens(ids, tokens: list) -> str:
+    """Token ids to a Transcript, normalised as the beam path normalises.
+
+    Both decoders must render text the same way or their disagreement would
+    partly be a difference in punctuation and case rather than in what was
+    read.
+    """
+    text = "".join(tokens[i] for i in ids)
+    return text.replace("<eos>", "").replace("\u2581", " ").strip().lower()
 
 
 def _video_transform():
@@ -82,6 +117,22 @@ class Recogniser:
             )
         text, _, _, _ = parse_hypothesis(hypotheses[0].asdict(), self.tokens)
         return text.replace("<eos>", "").replace("▁", " ").strip().lower()
+
+    def decode_ctc(self, encoded: torch.Tensor) -> str:
+        """Encoder output -> the CTC head's own Transcript, read greedily.
+
+        Deliberately given the *same* encoder output the beam search reads
+        (ADR-0011). Two decoders disagreeing about one encoding says something
+        about that encoding; two models disagreeing would say nothing.
+
+        The beam search already scores CTC alongside the decoder, so this is
+        not a second opinion from a fresh source — it is the CTC head's
+        unassisted reading, which is why it can differ from the joint result.
+        """
+        with torch.no_grad():
+            logprobs = self.model.ctc_v.log_softmax(encoded)
+        ids = logprobs.argmax(dim=-1).squeeze(0).tolist()
+        return _text_from_tokens(collapse_ctc(ids), self.tokens)
 
     def transcribe(self, crops: np.ndarray) -> str:
         return self.decode(self.encode(crops))

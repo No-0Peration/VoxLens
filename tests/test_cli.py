@@ -19,6 +19,7 @@ from voxlens.upstream import is_vendored
 
 CHECKPOINT = os.environ.get("VOXLENS_CHECKPOINT")
 FACE_CLIP = os.environ.get("VOXLENS_TEST_CLIP")
+CROP_CLIP = os.environ.get("VOXLENS_CROP_CLIP")
 
 needs_upstream = pytest.mark.skipif(
     not is_vendored(), reason="upstream not vendored — run: uv run python scripts/vendor.py"
@@ -26,6 +27,18 @@ needs_upstream = pytest.mark.skipif(
 needs_face_clip = pytest.mark.skipif(
     not (CHECKPOINT and FACE_CLIP and os.path.exists(CHECKPOINT) and os.path.exists(FACE_CLIP)),
     reason="set VOXLENS_CHECKPOINT and VOXLENS_TEST_CLIP to run this",
+)
+
+# A real mouth where there is one, and a pre-cropped clip otherwise. The tests
+# using this assert output shape and stream discipline, and a mouth improves
+# only the realism of the input — see scripts/make_crop_clip.py, which makes a
+# pre-cropped clip synthetically when no corpus is at hand.
+ANY_CLIP = FACE_CLIP or CROP_CLIP
+PRE_CROPPED = [] if FACE_CLIP else ["--pre-cropped"]
+needs_any_clip = pytest.mark.skipif(
+    not (CHECKPOINT and ANY_CLIP and os.path.exists(CHECKPOINT) and os.path.exists(ANY_CLIP)),
+    reason="set VOXLENS_CHECKPOINT and either VOXLENS_TEST_CLIP or "
+    "VOXLENS_CROP_CLIP to run this",
 )
 
 
@@ -291,3 +304,66 @@ def test_several_clips_load_the_checkpoint_once():
     assert len(lines) == 2, "expected one JSON object per Clip"
     for line in lines:
         assert json.loads(line)["transcript"]
+
+
+# --- decoder divergence (#22) ---------------------------------------------
+# Measured, not adopted: whether disagreement predicts being wrong is a
+# correlation over a corpus (voxlens-eval --divergence), and ADR-0011 requires
+# it before this number may be presented as confidence.
+
+@needs_upstream
+@needs_any_clip
+def test_divergence_is_absent_unless_it_is_asked_for():
+    """The default --json shape is what the evaluation harness depends on."""
+    payload = json.loads(
+        run_cli(ANY_CLIP, "--checkpoint", CHECKPOINT, "--json", *PRE_CROPPED).stdout
+    )
+    assert "divergence" not in payload
+
+
+@needs_upstream
+@needs_any_clip
+def test_divergence_reports_the_other_reading_and_claims_nothing():
+    result = run_cli(ANY_CLIP, "--checkpoint", CHECKPOINT, "--json", "--divergence", *PRE_CROPPED)
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+
+    reported = payload["divergence"]
+    assert 0.0 <= reported["value"] <= 1.0
+    assert isinstance(reported["ctc_transcript"], str)
+    # Per Clip, because the model emits no sentence boundaries at all — see the
+    # amendment on ADR-0011.
+    assert reported["unit"] == "clip"
+    assert reported["calibrated"] is False
+
+
+@needs_upstream
+@needs_any_clip
+def test_the_transcript_on_stdout_is_unchanged_by_divergence():
+    """A second reading is diagnostic. It must not alter what a user gets, and
+    it must not be spliced into the Transcript."""
+    plain = run_cli(ANY_CLIP, "--checkpoint", CHECKPOINT, *PRE_CROPPED)
+    with_flag = run_cli(ANY_CLIP, "--checkpoint", CHECKPOINT, "--divergence", *PRE_CROPPED)
+
+    assert with_flag.stdout.strip() == plain.stdout.strip()
+    assert "disagree" in with_flag.stderr
+    assert "disagree" not in with_flag.stdout
+
+
+@needs_upstream
+@needs_any_clip
+def test_the_two_decoders_do_read_the_clip_differently():
+    """The premise of ADR-0011, and of ADR-0008 before it. If this ever fails,
+    both ADRs need revisiting rather than the test being relaxed.
+
+    A face Clip makes this evidence about speech; a pre-cropped fixture only
+    makes it evidence about the two decoders, which is what is asserted.
+    """
+    payload = json.loads(
+        run_cli(
+            ANY_CLIP, "--checkpoint", CHECKPOINT, "--json", "--divergence", *PRE_CROPPED
+        ).stdout
+    )
+    assert payload["divergence"]["ctc_transcript"] != payload["transcript"] or (
+        payload["divergence"]["value"] == 0.0
+    )

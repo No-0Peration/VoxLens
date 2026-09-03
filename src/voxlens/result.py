@@ -66,9 +66,12 @@ class Result:
     occlusion_min_frames: int
     occlusions: tuple[OcclusionSpan, ...] = ()
     checkpoint: dict = field(default_factory=dict)
+    # Both are absent unless --divergence ran the second decoder.
+    divergence: float | None = None
+    ctc_transcript: str | None = None
 
     def as_dict(self) -> dict:
-        return {
+        payload = {
             "video": self.video,
             "frames": self.frames,
             "fps": round(self.fps, 2),
@@ -87,6 +90,36 @@ class Result:
                 "checkpoint": self.checkpoint,
             },
         }
+        if self.divergence is not None:
+            # Added only when asked for, so the default payload shape stays
+            # exactly what the evaluation harness already depends on.
+            payload["divergence"] = {
+                "value": round(self.divergence, 3),
+                "ctc_transcript": self.ctc_transcript,
+                # Per Clip, not per sentence: the model emits no sentence
+                # boundaries at all. See the amendment on ADR-0011.
+                "unit": "clip",
+                # Load-bearing: until the correlation ADR-0011 requires has
+                # been measured, this number is disagreement, not confidence.
+                "calibrated": False,
+            }
+        return payload
+
+    def divergence_line(self) -> str | None:
+        """The human-readable form of the second reading, for stderr.
+
+        Not spliced into the Transcript, for the reason ADR-0008 gives about
+        Occlusion — and not reduced to a label like "uncertain", because the
+        threshold that would justify one is precisely what has not been
+        measured yet. The number and the other reading are shown instead, so a
+        reader can judge the disagreement themselves.
+        """
+        if self.divergence is None:
+            return None
+        return (
+            f"decoders disagree by {self.divergence:.2f} (uncalibrated)"
+            f"  |  the CTC head read: {self.ctc_transcript!r}"
+        )
 
     def summary_line(self) -> str:
         """The one-line diagnostic, for stderr in both output modes."""
