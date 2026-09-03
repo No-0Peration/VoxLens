@@ -1,11 +1,13 @@
 # Live capture — design
 
-Tickets: [#18](https://github.com/No-0Peration/VoxLens/issues/18) measurement · [#19](https://github.com/No-0Peration/VoxLens/issues/19) transport · [#20](https://github.com/No-0Peration/VoxLens/issues/20) iOS app · [#21](https://github.com/No-0Peration/VoxLens/issues/21) windowing · [#22](https://github.com/No-0Peration/VoxLens/issues/22) confidence.
+Tickets: [#18](https://github.com/No-0Peration/VoxLens/issues/18) measurement · [#19](https://github.com/No-0Peration/VoxLens/issues/19) transport (built) · [#20](https://github.com/No-0Peration/VoxLens/issues/20) iOS app · [#21](https://github.com/No-0Peration/VoxLens/issues/21) windowing · [#22](https://github.com/No-0Peration/VoxLens/issues/22) confidence.
 Decisions: [ADR-0009](adr/0009-phone-is-a-camera-not-the-model-host.md), [ADR-0010](adr/0010-read-on-screen-never-aloud.md), [ADR-0011](adr/0011-confidence-from-decoder-disagreement.md), [ADR-0012](adr/0012-windowed-decoding-not-true-streaming.md).
 
-**Designed, not built.** Nothing described here exists yet. This records a design
-worked out in full before implementation, so the reasoning survives even if the
-work stalls.
+**Mostly designed, not built.** The transport is built (#19) — see
+[usage](usage.md#live-capture-crops-over-a-socket). Nothing else here exists yet:
+no camera feeds it, so the numbers below are still arithmetic rather than
+measurement. This records a design worked out in full before implementation, so
+the reasoning survives even if the work stalls.
 
 The idea: point a phone at someone speaking, and read what they are saying on the
 screen. The phone is the camera and does the cropping; a Mac runs the recogniser.
@@ -68,6 +70,10 @@ phone sends 96×96 mouth crops rather than video — roughly 0.7 MB/s raw, far l
 compressed. This puts zoom, tracking and hand-shake on the phone where they belong,
 and leaves the Mac doing exactly what it already does: crops in, text out, the same
 interface as `--pre-cropped`.
+
+The Mac side of that is the one part now built: `voxlens-serve` holds the checkpoint
+and answers sessions of crops, and `voxlens-replay` drives it from a file so the
+transport could be finished and tested before any Swift existed.
 
 On-device inference is an optimisation for later, not a precondition. The checkpoint
 is 4 GB and Core ML conversion is a project of its own; doing it first would delay

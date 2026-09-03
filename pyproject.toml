@@ -30,6 +30,10 @@ dependencies = [
 [project.scripts]
 voxlens = "voxlens.cli:main"
 voxlens-eval = "voxlens.evaluate:main"
+# Live capture (#19): the recogniser behind a socket, and the client that
+# stands in for a phone until #20 exists.
+voxlens-serve = "voxlens.serve:main"
+voxlens-replay = "voxlens.replay:main"
 
 [dependency-groups]
 dev = ["pytest>=8.0"]

@@ -116,6 +116,58 @@ it reports is what a user of the command actually gets.
 themselves — not claims of parity with published research
 ([ADR-0005](adr/0005-two-evaluation-bars.md)).
 
+## Live capture: crops over a socket
+
+The recogniser also runs as a small server that takes **mouth crops** instead of video
+files, so a camera somewhere else can feed it
+([ADR-0009](adr/0009-phone-is-a-camera-not-the-model-host.md)). That camera is meant to
+be a phone, and the phone app does not exist yet
+([#20](https://github.com/No-0Peration/VoxLens/issues/20)) — so what ships alongside the
+server is a client that replays crops from a file.
+
+```bash
+voxlens-serve --checkpoint "$VOXLENS_CHECKPOINT"
+```
+
+The checkpoint loads once, before the socket opens, so a client that connects has a
+recogniser waiting rather than a 4 GB load on its first message. It listens on
+`127.0.0.1:9601` — loopback only, so nothing is reachable from a network until you pass
+`--host`. `--port 0` takes any free port and prints the one it bound.
+
+Then, from anywhere that has crops:
+
+```bash
+voxlens-replay mouth.mp4
+```
+
+The transcript goes to stdout and diagnostics to stderr, exactly as with `voxlens`.
+`--json` emits the server's whole reply per batch, one JSON object per line.
+
+The input has to be **already-cropped** 96×96 mouth regions — what benchmark corpora
+ship, and what a phone would send. A file of whole frames is refused rather than guessed
+at: finding the face is the camera's job on this path. `.npy` arrays of shape
+`(frames, 96, 96, 3)` uint8 work too, which is the easy way to test without video.
+
+Pass several files and they go through one session, which is the point of a server: the
+checkpoint is loaded once and reused for all of them. `--chunk N` splits a file into
+N-frame batches, one transcript each — useful for exercising a session, but the batches
+are decoded independently and **not** stitched together. Overlapping windows with a
+visible revision boundary are [#21](https://github.com/No-0Peration/VoxLens/issues/21).
+
+What the wire expects:
+
+| | |
+| --- | --- |
+| Crops | 96×96×3 uint8 RGB — about 27 KB a frame, 0.7 MB/s at 25 fps |
+| Frame rate | Declared once per session, and refused unless it is 25 fps, the rate the checkpoint was trained at. Nothing is resampled quietly. |
+| Session | Named by the client and echoed in every reply, so two cameras are tellable apart in the output and the logs |
+| Losing the camera | A disconnect ends that session and nothing else — the loaded model is untouched and the next session finds it intact. A session that goes silent for five minutes is let go, since a phone in airplane mode never sends a goodbye. |
+
+**No authentication, and no encryption.** Crops of someone's mouth and the text of what
+they said would both cross the wire in the clear, which is why the default is loopback.
+Putting this on a network is a decision to make deliberately, and not on an untrusted
+one.
+
 ## What to expect from the output
 
 Roughly a third of clips come back word-perfect. Roughly one in seven comes back worse
