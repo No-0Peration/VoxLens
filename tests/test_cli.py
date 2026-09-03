@@ -323,7 +323,7 @@ def test_divergence_is_absent_unless_it_is_asked_for():
 
 @needs_upstream
 @needs_any_clip
-def test_divergence_reports_the_other_reading_and_claims_nothing():
+def test_divergence_reports_the_other_reading_and_what_it_is_worth():
     result = run_cli(ANY_CLIP, "--checkpoint", CHECKPOINT, "--json", "--divergence", *PRE_CROPPED)
     assert result.returncode == 0, result.stderr
     payload = json.loads(result.stdout)
@@ -334,7 +334,11 @@ def test_divergence_reports_the_other_reading_and_claims_nothing():
     # Per Clip, because the model emits no sentence boundaries at all — see the
     # amendment on ADR-0011.
     assert reported["unit"] == "clip"
-    assert reported["calibrated"] is False
+    # Calibrated as of #22: Spearman 0.755 against per-Clip WER over 571
+    # WildVSR Clips, so the band is measured rather than asserted.
+    assert reported["calibrated"] is True
+    assert reported["band"] in ("firm", "uncertain", "doubtful")
+    assert reported["band_mean_wer_pct"] > 0
 
 
 @needs_upstream

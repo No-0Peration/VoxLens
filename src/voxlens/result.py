@@ -93,15 +93,23 @@ class Result:
         if self.divergence is not None:
             # Added only when asked for, so the default payload shape stays
             # exactly what the evaluation harness already depends on.
+            from voxlens.confidence import BAND_WER_PCT, band
+
+            reading = band(self.divergence)
             payload["divergence"] = {
                 "value": round(self.divergence, 3),
                 "ctc_transcript": self.ctc_transcript,
                 # Per Clip, not per sentence: the model emits no sentence
                 # boundaries at all. See the amendment on ADR-0011.
                 "unit": "clip",
-                # Load-bearing: until the correlation ADR-0011 requires has
-                # been measured, this number is disagreement, not confidence.
-                "calibrated": False,
+                # Calibrated as of #22: Spearman 0.755 against per-Clip WER
+                # over 571 WildVSR Clips. The band is where this Clip's
+                # divergence falls, and mean_wer_pct is what Clips in that
+                # band actually scored — so a reader is told what the label
+                # costs rather than asked to trust the word.
+                "calibrated": True,
+                "band": reading,
+                "band_mean_wer_pct": BAND_WER_PCT[reading],
             }
         return payload
 
@@ -109,15 +117,20 @@ class Result:
         """The human-readable form of the second reading, for stderr.
 
         Not spliced into the Transcript, for the reason ADR-0008 gives about
-        Occlusion — and not reduced to a label like "uncertain", because the
-        threshold that would justify one is precisely what has not been
-        measured yet. The number and the other reading are shown instead, so a
-        reader can judge the disagreement themselves.
+        Occlusion. The label is now measured rather than asserted (#22), and it
+        is shown with the number behind it and what Clips in that band actually
+        scored — a reader who is told "uncertain" and nothing else has been
+        given a mood, not a measurement.
         """
         if self.divergence is None:
             return None
+        from voxlens.confidence import BAND_WER_PCT, band
+
+        reading = band(self.divergence)
         return (
-            f"decoders disagree by {self.divergence:.2f} (uncalibrated)"
+            f"reading is {reading.upper()}: decoders disagree by "
+            f"{self.divergence:.2f}, and Clips in that band average "
+            f"{BAND_WER_PCT[reading]:.0f}% word errors"
             f"  |  the CTC head read: {self.ctc_transcript!r}"
         )
 
