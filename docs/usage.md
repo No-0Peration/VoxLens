@@ -178,6 +178,12 @@ voxlens-eval /path/to/corpora --corpus lrs3 \
   --checkpoint "$VOXLENS_CHECKPOINT" --out results.json
 ```
 
+Three corpus kinds: `lrs3` and `wildvsr` are the benchmark splits, and `captured`
+is footage you shot yourself through a lens — the only one that is not pre-cropped,
+since it has whole faces in it. That path exists for
+[measuring what the camera costs](camera-path-measurement.md), and it reports WER
+per group so distances do not average into one meaningless number.
+
 Reports word error rate and throughput, and writes per-clip references and hypotheses
 so you can read the worst failures rather than only the average. `--stride N` samples
 every Nth clip for a fast estimate; sampling is by stride rather than taking the first

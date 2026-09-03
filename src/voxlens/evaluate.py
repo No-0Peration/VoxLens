@@ -21,7 +21,7 @@ import sys
 from dataclasses import dataclass
 from pathlib import Path
 
-__all__ = ["ClipScore", "evaluate", "load_corpus", "normalise", "wer"]
+__all__ = ["ClipScore", "evaluate", "group_of", "load_corpus", "normalise", "wer"]
 
 # Reference normalisation, stated once because a WER is meaningless without it:
 # lowercase, collapse runs of whitespace, drop surrounding space. Apostrophes
@@ -69,6 +69,18 @@ class ClipScore:
     divergence: float | None = None
 
 
+def group_of(path: Path | str) -> str:
+    """The part of a filename before the first underscore, or "" if there is none.
+
+    Only meaningful for captured footage (#18), where the group is the shooting
+    condition — `5m_00001.mp4` is the Clip shot at five metres. A mean WER over
+    every distance at once would hide the boundary the measurement exists to
+    find.
+    """
+    name = Path(path).stem
+    return name.split("_")[0] if "_" in name else ""
+
+
 def load_corpus(root: Path, kind: str, stride: int = 1, limit: int | None = None):
     """Return (clip_path, reference) pairs for a corpus.
 
@@ -87,12 +99,35 @@ def load_corpus(root: Path, kind: str, stride: int = 1, limit: int | None = None
             (root / "muavic/en/video/test" / f"{clip_id}.mp4", ref)
             for clip_id, ref in zip(ids, refs)
         ]
+    elif kind == "captured":
+        # Footage shot through a lens (#18), which is the only corpus that is
+        # NOT pre-cropped: it has whole faces in it, so extraction has to run.
+        # references.tsv is written by whoever did the filming: one line per
+        # Clip, filename and the words that were actually said.
+        manifest = root / "references.tsv"
+        if not manifest.exists():
+            raise ValueError(
+                f"{manifest} not found. Captured footage needs a references.tsv "
+                "of `filename<TAB>reference text` — see docs/camera-path-measurement.md."
+            )
+        pairs = []
+        for number, line in enumerate(manifest.read_text().splitlines(), start=1):
+            if not line.strip() or line.lstrip().startswith("#"):
+                continue
+            parts = line.split("\t")
+            if len(parts) < 2:
+                raise ValueError(
+                    f"{manifest}:{number}: expected `filename<TAB>reference`, got {line!r}"
+                )
+            pairs.append((root / parts[0].strip(), "\t".join(parts[1:]).strip()))
     elif kind == "wildvsr":
         base = root / "wildvsr/WildVSR"
         labels = json.loads((base / "labels.json").read_text())
         pairs = [(base / "videos" / name, text) for name, text in sorted(labels.items())]
     else:
-        raise ValueError(f"Unknown corpus {kind!r}. Choose from: lrs3, wildvsr.")
+        raise ValueError(
+            f"Unknown corpus {kind!r}. Choose from: lrs3, wildvsr, captured."
+        )
 
     pairs = [(path, ref) for path, ref in pairs if path.exists()][::stride]
     return pairs[:limit] if limit else pairs
@@ -105,6 +140,7 @@ def evaluate(
     beam: int,
     voxlens: list[str],
     with_divergence: bool = False,
+    pre_cropped: bool = True,
 ):
     """Run the CLI over every Clip and score the results."""
     command = [
@@ -116,7 +152,8 @@ def evaluate(
         "--json",
         # Every obtainable corpus ships pre-cropped Mouth Regions (ADR-0005).
         # Running face detection over them would crop a face out of a mouth.
-        "--pre-cropped",
+        # Footage shot through a lens is the exception: it has a face in it.
+        *(["--pre-cropped"] if pre_cropped else []),
         *(["--divergence"] if with_divergence else []),
     ]
     process = subprocess.run(command, capture_output=True, text=True)
@@ -159,7 +196,9 @@ def main(argv: list[str] | None = None) -> int:
         description="Score VoxLens against a corpus by driving the voxlens CLI.",
     )
     parser.add_argument("root", help="directory holding the corpus")
-    parser.add_argument("--corpus", required=True, choices=["lrs3", "wildvsr"])
+    parser.add_argument(
+        "--corpus", required=True, choices=["lrs3", "wildvsr", "captured"]
+    )
     parser.add_argument("--checkpoint", required=True)
     parser.add_argument("--device", default="hybrid", choices=["hybrid", "mps", "cpu"])
     parser.add_argument("--beam", type=int, default=1)
@@ -186,6 +225,7 @@ def main(argv: list[str] | None = None) -> int:
         pairs, Path(args.checkpoint), args.device, args.beam,
         voxlens=[sys.executable, "-m", "voxlens.cli"],
         with_divergence=args.divergence,
+        pre_cropped=args.corpus != "captured",
     )
     if not scores:
         print("voxlens-eval: no Clip produced a Transcript", file=sys.stderr)
@@ -209,6 +249,31 @@ def main(argv: list[str] | None = None) -> int:
         "rtf": round(weighted_rtf, 3),
         "config": {"device": args.device, "beam": args.beam, "stride": args.stride},
     }
+
+    groups = {group_of(score.clip) for score in scores}
+    if groups - {""}:
+        # Captured footage is shot under conditions that are the point of the
+        # measurement — distance above all (#18). One mean over all of them
+        # would hide exactly the boundary being looked for.
+        summary["by_group"] = [
+            {
+                "group": group,
+                "clips": len(in_group),
+                "words": sum(score.words for score in in_group),
+                "wer_pct": (
+                    round(
+                        100 * sum(s.errors for s in in_group)
+                        / sum(s.words for s in in_group),
+                        2,
+                    )
+                    if sum(s.words for s in in_group)
+                    else None
+                ),
+            }
+            for group in sorted(groups)
+            for in_group in [[s for s in scores if group_of(s.clip) == group]]
+            if in_group
+        ]
 
     if args.divergence:
         # Imported here rather than at module scope: voxlens.confidence reuses
