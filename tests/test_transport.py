@@ -450,3 +450,158 @@ def test_a_silent_session_is_closed_rather_than_held_open(serve):
     server.idle_timeout = 10
     with client_for(server, session="after") as client:
         assert client.send_crops(crops(5))["transcript"] == "5 crops"
+
+
+# --- Stream sessions (#21) -------------------------------------------------
+# Windowed decoding over the socket: the same seam, a different session mode.
+
+def sliding(words: str, size: int = 5):
+    """A stub reading a sliding stretch of one sentence, as real overlapping
+    windows of speech would — each window sees a little further than the last."""
+    vocabulary = words.split()
+    state = {"n": 0}
+
+    def transcribe(batch):
+        start = state["n"]
+        state["n"] += 1
+        return " ".join(vocabulary[start : start + size])
+
+    return transcribe
+
+
+SENTENCE = "one two three four five six seven eight nine ten eleven twelve"
+
+
+def stream_client(server, **kwargs):
+    from voxlens.transport import STREAM_MODE
+
+    return client_for(server, mode=STREAM_MODE, **kwargs)
+
+
+def test_a_stream_session_says_so_at_hello(serve):
+    with stream_client(serve(), session="camera") as client:
+        assert client.ready["mode"] == "stream"
+
+
+def test_every_message_gets_exactly_one_reply_even_before_a_window_fills(serve):
+    """Three seconds have to arrive before anything can be decoded. Replying
+    per window rather than per message would leave the client reading a queue
+    whose length it cannot predict."""
+    server = serve(transcribe=sliding(SENTENCE))
+    with stream_client(server) as client:
+        first = client.send_crops(crops(25))
+        assert first["windows"] == []
+        assert first["text"] == ""
+        assert first["stream_s"] == 1.0
+        client.send_crops(crops(25))
+        third = client.send_crops(crops(25))
+
+    assert len(third["windows"]) == 1
+    assert third["windows"][0]["start_s"] == 0.0
+    assert third["windows"][0]["end_s"] == 3.0
+
+
+def test_overlapping_windows_arrive_as_one_transcript_not_repeats(serve):
+    server = serve(transcribe=sliding(SENTENCE))
+    with stream_client(server) as client:
+        for _ in range(6):
+            reply = client.send_crops(crops(25))
+
+    assert reply["text"] == "one two three four five six seven eight"
+
+
+def test_the_frozen_and_provisional_parts_travel_separately(serve):
+    """A client that cannot tell them apart has to distrust all of it."""
+    server = serve(transcribe=sliding(SENTENCE))
+    with stream_client(server) as client:
+        for _ in range(5):
+            reply = client.send_crops(crops(25))
+
+    assert reply["frozen"] and reply["provisional"]
+    assert reply["text"] == f"{reply['frozen']} {reply['provisional']}"
+
+
+def test_frozen_text_never_changes_across_a_session(serve):
+    server = serve(transcribe=sliding(SENTENCE))
+    frozen = []
+    with stream_client(server) as client:
+        for _ in range(7):
+            frozen.append(client.send_crops(crops(25))["frozen"])
+
+    for earlier, later in zip(frozen, frozen[1:]):
+        assert later.startswith(earlier), "frozen text was rewritten mid-session"
+
+
+def test_lag_is_measured_and_reported(serve):
+    """Reported, not assumed: from the arrival of the window's last Frame to
+    the moment it finished decoding."""
+    server = serve(transcribe=sliding(SENTENCE))
+    with stream_client(server) as client:
+        for _ in range(3):
+            reply = client.send_crops(crops(25))
+
+    assert reply["lag_s"] is not None and reply["lag_s"] >= 0.0
+    assert reply["windows"][0]["lag_s"] >= 0.0
+
+
+def test_an_occlusion_cuts_the_window_and_settles_the_text(serve):
+    """Where the signal is lost there is nothing for a later window to read,
+    so nothing before it stays provisional."""
+    server = serve(transcribe=sliding(SENTENCE))
+    with stream_client(server) as client:
+        for _ in range(4):
+            client.send_crops(crops(25))
+        reply = client.send_occlusion(50)
+
+    assert reply["provisional"] == ""
+    assert reply["frozen"]
+    assert reply["occlusion_s"] == 2.0
+    assert reply["reason"] == "occlusion"
+
+
+def test_an_occlusion_makes_no_sense_in_a_clip_session(serve):
+    with client_for(serve()) as client:
+        with pytest.raises(ServerError) as caught:
+            client.send_occlusion(10)
+    assert caught.value.code == "protocol"
+
+
+def test_goodbye_reads_the_tail_the_windows_never_reached(serve):
+    """A Stream that stops mid-window still has seconds nobody has decoded."""
+    server = serve(transcribe=sliding(SENTENCE))
+    client = stream_client(server)
+    client.open()
+    for _ in range(4):
+        client.send_crops(crops(25))
+    partial = client.send_crops(crops(10))
+    final = client.close()
+
+    assert partial["windows"] == []
+    assert final["reason"] == "final"
+    assert final["provisional"] == "", "a Stream that has ended has nothing provisional"
+    assert len(final["text"].split()) > len(partial["text"].split())
+
+
+def test_a_long_stream_does_not_grow_without_bound(serve):
+    """Frames no future window can reach are dropped, or a camera left running
+    would fill the Mac's memory with crops nobody will read again."""
+    server = serve(transcribe=sliding(SENTENCE + " " + SENTENCE))
+    with stream_client(server) as client:
+        for _ in range(12):
+            client.send_crops(crops(25))
+        # 300 Frames sent; the buffer holds only what a future window needs.
+        assert client.ready["mode"] == "stream"
+
+
+def test_replay_streams_a_file_and_shows_the_boundary(serve, tmp_path):
+    server = serve(transcribe=sliding(SENTENCE))
+    path = tmp_path / "stream.npy"
+    np.save(path, crops(150))
+
+    result = run_replay(str(path), "--port", str(server.port), "--stream")
+
+    assert result.returncode == 0, result.stderr
+    lines = [line for line in result.stdout.splitlines() if line.strip()]
+    assert any("[" in line for line in lines), "the provisional edge must be visible"
+    assert "[" not in lines[-1], "the settled Transcript has no provisional edge"
+    assert "lag over" in result.stderr

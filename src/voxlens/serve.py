@@ -30,12 +30,16 @@ from dataclasses import dataclass, field
 from voxlens.cli import EXIT_BAD_INPUT, EXIT_MODEL, EXIT_OK
 from voxlens.devices import DEFAULT_DEVICE, resolve_device
 from voxlens.result import Timing, checkpoint_identity
+from voxlens.windowing import Stitcher, Windower
 from voxlens.transport import (
+    CLIP_MODE,
     CROP_SIZE,
     DEFAULT_HOST,
     DEFAULT_PORT,
     MAX_CROPS_PER_MESSAGE,
+    MODES,
     PROTOCOL_VERSION,
+    STREAM_MODE,
     TARGET_FPS,
     Disconnected,
     ProtocolError,
@@ -70,9 +74,25 @@ class Session:
 
     id: str
     fps: float
+    mode: str = CLIP_MODE
     frames: int = 0
     requests: int = 0
     started: float = field(default_factory=time.monotonic)
+
+    # Stream sessions only (ADR-0012). The buffer holds the Frames a future
+    # window could still need and nothing more; `base` is the Stream index of
+    # its first Frame, and `arrivals` records when each Frame reached the Mac,
+    # which is what makes lag a measurement rather than an assumption.
+    windower: Windower | None = None
+    stitcher: Stitcher | None = None
+    buffer: list = field(default_factory=list)
+    arrivals: list = field(default_factory=list)
+    base: int = 0
+    occluded_frames: int = 0
+
+    @property
+    def buffered_to(self) -> int:
+        return self.base + len(self.buffer)
 
 
 class CropServer(socketserver.ThreadingTCPServer):
@@ -131,7 +151,10 @@ class _Handler(socketserver.StreamRequestHandler):
                     session = self._begin(header)
                 elif kind == "crops":
                     self._transcribe(session, header, payload)
+                elif kind == "occlusion":
+                    self._occlusion(session, header)
                 elif kind == "bye":
+                    self._end_of_stream(session)
                     self._finish(session, "left")
                     return
                 elif kind == "hello":
@@ -173,8 +196,19 @@ class _Handler(socketserver.StreamRequestHandler):
             )
         fps = check_fps(header.get("fps"))
 
-        session = Session(id=identity, fps=fps)
-        self.server.log(f"session {session.id} opened from {self.client_address[0]}")
+        mode = header.get("mode", CLIP_MODE)
+        if mode not in MODES:
+            raise ProtocolError(
+                f"unknown session mode {mode!r}; this server speaks {', '.join(MODES)}"
+            )
+
+        session = Session(id=identity, fps=fps, mode=mode)
+        if mode == STREAM_MODE:
+            session.windower = Windower(fps=fps)
+            session.stitcher = Stitcher()
+        self.server.log(
+            f"session {session.id} opened from {self.client_address[0]} ({mode})"
+        )
         send_message(
             self.wfile,
             {
@@ -185,6 +219,7 @@ class _Handler(socketserver.StreamRequestHandler):
                 # client that gets crops wrong should find out at hello.
                 "crop": {"size": CROP_SIZE, "channels": 3, "dtype": "uint8", "layout": "RGB"},
                 "fps": session.fps,
+                "mode": session.mode,
                 "max_frames_per_message": MAX_CROPS_PER_MESSAGE,
                 "config": {
                     "device": self.server.device,
@@ -204,6 +239,11 @@ class _Handler(socketserver.StreamRequestHandler):
                 f"{frames} crops exceeds {MAX_CROPS_PER_MESSAGE} in one message"
             )
         crops = decode_crops(payload, frames)
+        session.requests += 1
+
+        if session.mode == STREAM_MODE:
+            self._stream(session, crops)
+            return
 
         started = time.perf_counter()
         try:
@@ -217,7 +257,6 @@ class _Handler(socketserver.StreamRequestHandler):
             raise
         infer_s = time.perf_counter() - started
 
-        session.requests += 1
         session.frames += frames
         duration_s = frames / session.fps
         # extract_s is zero because extraction happened on the camera, which is
@@ -238,6 +277,147 @@ class _Handler(socketserver.StreamRequestHandler):
                 "timing": timing.as_dict(),
             },
         )
+
+    # --- Stream sessions (ADR-0012) --------------------------------------
+
+    def _stream(self, session: Session, crops) -> None:
+        """Buffer Frames, decode every window they complete, reply once.
+
+        Exactly one reply per message, in Stream mode as in Clip mode. A batch
+        of crops usually completes no window at all — three seconds have to
+        arrive before the first one — and occasionally completes two. Replying
+        per window would leave the client reading a queue it cannot predict the
+        length of, so the reply carries the current reading and says which
+        windows went into it.
+        """
+        arrived = time.monotonic()
+        session.buffer.extend(crops)
+        session.arrivals.extend([arrived] * len(crops))
+        session.frames += len(crops)
+
+        decoded = [
+            self._decode_window(session, window)
+            for window in session.windower.feed(session.buffered_to)
+        ]
+        self._prune(session)
+        self._send_stream_transcript(session, session.stitcher.current(), decoded)
+
+    def _decode_window(self, session: Session, window) -> dict:
+        """Read one window and reconcile it. Returns what it cost and covered."""
+        import numpy as np
+
+        start = window.start_frame - session.base
+        end = window.end_frame - session.base
+        if start < 0 or end > len(session.buffer) or end <= start:
+            # Only reachable if pruning and scheduling disagreed, which would
+            # mean decoding the wrong stretch of speech — worth a loud failure
+            # rather than a quietly shifted Transcript.
+            raise RuntimeError(
+                f"window {window} is outside the buffer "
+                f"[{session.base}, {session.buffered_to})"
+            )
+
+        started = time.perf_counter()
+        with self.server.lock:
+            reading = self.server.transcribe(np.stack(session.buffer[start:end]))
+        infer_s = time.perf_counter() - started
+        session.stitcher.add(reading)
+
+        start_s, end_s = window.seconds(session.fps)
+        return {
+            "start_s": round(start_s, 3),
+            "end_s": round(end_s, 3),
+            "frames": window.frames,
+            "reason": window.reason,
+            "infer_s": round(infer_s, 3),
+            # Lag as measured, not as designed: from the arrival of this
+            # window's last Frame to the moment it finished decoding. It
+            # includes the wait for the window to fill, which is the part a
+            # reader actually feels.
+            "lag_s": round(time.monotonic() - session.arrivals[end - 1], 3),
+        }
+
+    def _prune(self, session: Session) -> None:
+        """Drop Frames no future window can reach, so a long Stream is bounded.
+
+        A window's worth of the most recent Frames is always retained, even
+        when the next scheduled window starts after them: if the Stream ends
+        here, the tail window reads back a full window from the last Frame,
+        and pruning to the schedule alone would have thrown those away.
+        """
+        keep_from = max(
+            0,
+            min(session.windower.next_start, session.buffered_to - session.windower.window),
+        )
+        drop = keep_from - session.base
+        if drop > 0:
+            del session.buffer[:drop]
+            del session.arrivals[:drop]
+            session.base += drop
+
+    def _occlusion(self, session: Session, header: dict) -> None:
+        """The camera lost the mouth: cut the window and settle the text."""
+        frames = header.get("frames")
+        if not isinstance(frames, int) or isinstance(frames, bool) or frames <= 0:
+            raise ProtocolError(f"an Occlusion must count its Frames; got {frames!r}")
+        if session.mode != STREAM_MODE:
+            raise ProtocolError(
+                "Occlusion is a Stream-session message; a Clip session has no "
+                "window to cut"
+            )
+
+        session.occluded_frames += frames
+        at = session.buffered_to
+        decoded = [
+            self._decode_window(session, window)
+            for window in session.windower.cut(at, at)
+        ]
+        # Nothing later covers this stretch, so nothing here is provisional.
+        live = session.stitcher.freeze()
+        self._prune(session)
+        self._send_stream_transcript(
+            session, live, decoded, reason="occlusion", occluded=frames / session.fps
+        )
+
+    def _end_of_stream(self, session: Session) -> None:
+        """A Stream that says goodbye still has a tail nobody has read."""
+        if session.mode != STREAM_MODE or session.windower is None:
+            return
+        decoded = [
+            self._decode_window(session, window)
+            for window in session.windower.finish(session.buffered_to)
+        ]
+        live = session.stitcher.freeze()
+        self._send_stream_transcript(session, live, decoded, reason="final")
+
+    def _send_stream_transcript(
+        self,
+        session: Session,
+        live,
+        decoded: list,
+        reason: str = "windows",
+        occluded: float = 0.0,
+    ) -> None:
+        message = {
+            "type": "transcript",
+            "session": session.id,
+            "mode": STREAM_MODE,
+            "sequence": session.requests,
+            "reason": reason,
+            # Frozen and provisional travel apart, so a client cannot render
+            # them as one indistinguishable block (ADR-0012).
+            **live.as_dict(),
+            "transcript": live.text,
+            "windows": decoded,
+            "stream_s": round(
+                (session.frames + session.occluded_frames) / session.fps, 3
+            ),
+            # The newest window's lag is the one a reader is waiting on.
+            "lag_s": decoded[-1]["lag_s"] if decoded else None,
+        }
+        if occluded:
+            message["occlusion_s"] = round(occluded, 3)
+        send_message(self.wfile, message)
 
     def _finish(self, session: Session | None, how: str) -> None:
         if session is None:

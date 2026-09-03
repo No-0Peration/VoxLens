@@ -33,6 +33,7 @@ from dataclasses import dataclass, field
 import numpy as np
 
 __all__ = [
+    "CLIP_MODE",
     "CROP_BYTES",
     "CROP_SHAPE",
     "CROP_SIZE",
@@ -45,6 +46,7 @@ __all__ = [
     "ProtocolError",
     "ServerError",
     "TARGET_FPS",
+    "STREAM_MODE",
     "check_fps",
     "decode_crops",
     "encode_crops",
@@ -56,6 +58,14 @@ __all__ = [
 # against an older protocol is refused with a sentence rather than dropping
 # into a mismatched read.
 PROTOCOL_VERSION = 1
+
+# What a session is for. A Clip session answers one Transcript per batch of
+# crops, which is what a corpus replay wants. A Stream session decodes in
+# overlapping windows and revises its own recent text (ADR-0012), which is what
+# a camera wants. Declared at hello because it changes what the replies mean.
+CLIP_MODE = "clip"
+STREAM_MODE = "stream"
+MODES = (CLIP_MODE, STREAM_MODE)
 
 # The crop contract, restated from extraction: 96x96 RGB uint8 at 25 fps. The
 # recogniser centre-crops to 88 itself, so 96 is what crosses the wire.
@@ -236,6 +246,7 @@ class CropClient:
     port: int = DEFAULT_PORT
     session: str = ""
     fps: float = TARGET_FPS
+    mode: str = CLIP_MODE
     timeout: float | None = 300.0
     ready: dict = field(default_factory=dict)
 
@@ -260,6 +271,7 @@ class CropClient:
                 "protocol": PROTOCOL_VERSION,
                 "session": self.session,
                 "fps": self.fps,
+                "mode": self.mode,
             },
         )
         self.ready = self._expect("ready")
@@ -273,13 +285,36 @@ class CropClient:
         send_message(self._wfile, {"type": "crops", "frames": len(crops)}, payload)
         return self._expect("transcript")
 
-    def close(self) -> None:
-        """Leave the session cleanly. Safe to call on a connection already gone."""
+    def send_occlusion(self, frames: int) -> dict:
+        """Report Frames the camera could not read, rather than sending noise.
+
+        The alternative is to send crops of whatever was in front of the lens,
+        which the recogniser would read as mouth movement — the invented text
+        this project exists not to produce. In a Stream session this also cuts
+        the decoding window, since the signal is gone anyway (ADR-0012).
+        """
         if self._socket is None:
-            return
+            raise RuntimeError("open() the client before reporting an Occlusion")
+        if frames <= 0:
+            raise ValueError("an Occlusion covers at least one Frame")
+        send_message(self._wfile, {"type": "occlusion", "frames": frames})
+        return self._expect("transcript")
+
+    def close(self) -> dict | None:
+        """Leave the session cleanly. Safe to call on a connection already gone.
+
+        A Stream session gets one last message back: the goodbye flushes the
+        tail of the Stream, which no window had covered yet, and settles what
+        was still provisional. That final reading is returned.
+        """
+        if self._socket is None:
+            return None
+        final = None
         try:
             send_message(self._wfile, {"type": "bye"})
-        except (OSError, ValueError):
+            if self.mode == STREAM_MODE:
+                final = self._expect("transcript")
+        except (OSError, ValueError, ProtocolError, Disconnected, ServerError):
             pass  # the server left first; there is nothing to be polite about
         for handle in (self._rfile, self._wfile, self._socket):
             try:
@@ -287,6 +322,7 @@ class CropClient:
             except OSError:
                 pass
         self._socket = self._rfile = self._wfile = None
+        return final
 
     def _expect(self, kind: str) -> dict:
         header, _ = read_message(self._rfile)
