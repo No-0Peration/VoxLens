@@ -1,6 +1,6 @@
 # Confidence from decoder disagreement
 
-**Status:** accepted — **validated and adopted**, amended twice (on the unit, and on what it costs). The correlation this ADR demanded before trusting the idea has been run: Spearman **0.755** against per-Clip WER over 571 WildVSR Clips. Divergence is now presented as calibrated confidence, in measured bands.
+**Status:** accepted — **validated and adopted**, amended twice (on the unit, and on what it costs). The correlation this ADR demanded before trusting the idea has been run over the whole WildVSR test split: Spearman **0.752** against per-Clip WER across all 2,854 Clips. Divergence is now presented as calibrated confidence, in measured bands.
 
 Confidence for one unit of speech — stated here as a sentence, amended below to the Clip — is derived from how much the **CTC** and **beam-search** decoders disagree about it. Both read the same encoder output; agreement is evidence, divergence is doubt.
 
@@ -25,37 +25,47 @@ Read `spearman` first — per-Clip WER is unbounded above, so a monotone relatio
 
 ### The validation, run
 
-571 Clips of the WildVSR test split, stride 5, beam 1, hybrid device, both decoders
-over the same encoder output:
+The whole WildVSR test split — all 2,854 Clips, beam 1, hybrid device, both
+decoders over the same encoder output:
 
 | | |
 | --- | --- |
-| Spearman, divergence against per-Clip WER | **0.755** |
-| Pearson | 0.748 |
-| mean divergence | 0.376 |
-| overall WER | 47.78% — against a recorded baseline of 47.85%, so nothing else moved |
+| Spearman, divergence against per-Clip WER | **0.752** |
+| Pearson | 0.721 |
+| mean divergence | 0.387 |
+| overall WER | 50.0% (see the note below) |
 
 Banded by divergence tercile:
 
 | divergence | Clips | mean WER |
 | --- | --- | --- |
-| 0.00 – 0.25 | 190 | **27.6%** |
-| 0.25 – 0.47 | 191 | 46.6% |
-| 0.47 – 1.00 | 190 | **76.5%** |
+| 0.00 – 0.27 | 951 | **28.8%** |
+| 0.27 – 0.48 | 952 | 50.7% |
+| 0.48 – 1.00 | 951 | **79.3%** |
 
-**Decision: adopt.** Forty-nine points of WER separate the band where the decoders
-agree from the band where they do not. A signal that moved WER from 30% to 34%
-would not have earned a user-facing number; this one does.
+**Decision: adopt.** Fifty points of WER separate the band where the decoders agree
+from the band where they do not. A signal that moved WER from 30% to 34% would not
+have earned a user-facing number; this one does.
 
 **It is not clip length in disguise.** Divergence against reference length
-correlates at −0.05, and restricted to Clips of eight words or more (n=528) the
-relationship is unchanged at 0.756. That was the obvious confound — short Clips
+correlates at −0.07, and restricted to Clips of eight words or more (n=2,637) the
+relationship is unchanged at 0.759. That was the obvious confound — short Clips
 being both harder and more divergent — and it is not what is happening.
 
-**What "firm" does not mean.** Clips in the agreeing band still average 27.6% word
-errors, and about one in thirty comes back word-perfect. The label says the two
-decoders agreed, which is the best evidence available short of knowing. It does
-not say the text is right.
+**What "firm" does not mean.** Clips in the agreeing band still average 28.8% word
+errors, and only one in twenty-eight comes back word-perfect. What the label does
+mean is that the two decoders agreed — and **34 of the 36 word-perfect Clips in the
+entire corpus fall in this band**. Where the model is exactly right at all, it is
+right here.
+
+*(A stride-5 sample of 571 Clips, run first, gave Spearman 0.755 and the same band
+structure. The full split is what the numbers above come from.)*
+
+**A side effect worth recording: the corpus baseline moved.** The full split scores
+**50.0%** WER, where the recorded baseline of 47.85% came from a 570-Clip stride
+sample. Re-running that same sample here reproduced it at 47.78%, so nothing
+regressed — sampling was simply about two points optimistic. The full number is the
+one to compare against from now on. See the note on [ADR-0005](0005-two-evaluation-bars.md).
 
 The bands are the tercile boundaries above, used as thresholds because they were
 measured rather than chosen.

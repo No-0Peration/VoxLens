@@ -140,7 +140,7 @@ everything before it, since no later window will cover that stretch.
 The model has two ways to turn the same encoding into words: a beam search, which is
 what you normally get, and the CTC head reading greedily. They routinely disagree.
 **How much they disagree predicts how wrong the text is** — measured, not assumed:
-Spearman 0.755 against per-clip WER over 571 WildVSR clips
+Spearman 0.752 against per-clip WER over the whole 2,854-clip WildVSR test set
 ([ADR-0011](adr/0011-confidence-from-decoder-disagreement.md)).
 
 ```bash
@@ -150,7 +150,7 @@ voxlens interview.mp4 --checkpoint "$VOXLENS_CHECKPOINT" --divergence
 ```
 the choices don't make sense because it's the wrong question
 208 frames, 8.3s, RTF 0.51  |  6 occlusion(s), 61 frame(s) with no detected face
-reading is FIRM: decoders disagree by 0.18, and Clips in that band average 27% word errors  |  the CTC head read: 'the choices don't make sense because its the wrong question'
+reading is FIRM: decoders disagree by 0.18, and Clips in that band average 29% word errors  |  the CTC head read: 'the choices don't make sense because its the wrong question'
 ```
 
 Three bands, and they are tercile boundaries from that measurement rather than
@@ -158,13 +158,15 @@ numbers anybody picked:
 
 | band | divergence | what clips in it actually scored |
 | --- | --- | --- |
-| `firm` | below 0.25 | 27.6% WER |
-| `uncertain` | 0.25 – 0.47 | 46.6% WER |
-| `doubtful` | 0.47 and up | 76.5% WER |
+| `firm` | below 0.27 | 28.8% WER |
+| `uncertain` | 0.27 – 0.48 | 50.7% WER |
+| `doubtful` | 0.48 and up | 79.3% WER |
 
 **"Firm" does not mean right.** Clips in that band still average better than one
-word in four wrong, and about one in thirty comes back word-perfect. It means the
-two decoders agreed, which is the best evidence available short of knowing. The
+word in four wrong, and only one in twenty-eight comes back word-perfect. What it
+does mean is that the two decoders agreed — and 34 of the 36 word-perfect clips in
+the whole corpus are in this band. Where the model is exactly right at all, it is
+right here. The
 number and the band travel together for that reason — a reader told only
 "uncertain" has been given a mood, not a measurement.
 
@@ -205,7 +207,7 @@ The harness drives the CLI rather than reaching into Python internals, so the nu
 it reports is what a user of the command actually gets.
 
 **Current baselines**, greedy decoding: **34.3% WER** on the full LRS3 test split,
-**47.9%** on a WildVSR sample. These are regression targets measured against
+**50.0%** across the whole 2,854-clip WildVSR test set. These are regression targets measured against
 themselves — not claims of parity with published research
 ([ADR-0005](adr/0005-two-evaluation-bars.md)).
 

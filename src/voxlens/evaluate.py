@@ -6,7 +6,10 @@ handling or output shape cannot hide behind a path only tests exercise.
 
 Measured baselines at beam 1, for regression detection:
     LRS3 test split   34.22% WER   (1,320 Clips, calibration)
-    WildVSR           47.85% WER   (570-Clip stride sample, authoritative)
+    WildVSR           50.00% WER   (all 2,854 Clips, authoritative)
+    WildVSR           47.85% WER   (570-Clip stride sample — about two points
+                                    optimistic against the full split, kept
+                                    because older results were measured on it)
 
 Per ADR-0005 these are valid against themselves, and are NOT claims of parity
 with published figures — see docs/adr/0005 for the unresolved discrepancy.
