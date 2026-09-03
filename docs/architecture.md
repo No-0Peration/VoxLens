@@ -56,6 +56,8 @@ Two things in that diagram carry most of the design.
 | occlusion | Detection mask → spans (pure function) | Detecting anything itself |
 | CLI | Argument surface, orchestration, rendering, exit codes | Any recognition logic |
 | harness | Running the CLI over a corpus, scoring | Reaching into internals |
+| `voxlens.transport` | The wire for live capture: message framing, the crop contract on it, and the client that stands in for a phone | Recognition, cameras, sessions |
+| server | Sessions, one loaded recogniser, serialising inference across cameras | Extraction — the camera did that |
 
 The recogniser itself is **not** a VoxLens module. It is vendored upstream code, reached only through `voxlens.upstream`, which is the single place aware that `vendor/` exists.
 
@@ -79,7 +81,7 @@ Beam width dominates when raised: at beam 40 the decoder alone is 3.45 RTF, maki
 
 ## Testing shape
 
-Two seams: the **CLI process boundary**, and the **occlusion span function**. The evaluation harness goes through the CLI rather than around it, so measurements describe the shipped path. See [ADR-0007](adr/0007-the-cli-is-the-seam.md).
+Three seams: the **CLI process boundary**, the **live-capture socket**, and the **occlusion span function**. The evaluation harness goes through the CLI rather than around it, so measurements describe the shipped path — nothing is measured through the socket, which adds a network rather than a recogniser. See [ADR-0007](adr/0007-the-cli-is-the-seam.md) and its amendment.
 
 ## What is deliberately absent
 
@@ -107,7 +109,7 @@ exists:
 
 | ADR | Decision | Status |
 | --- | --- | --- |
-| [0009](adr/0009-phone-is-a-camera-not-the-model-host.md) | The phone is a camera, not the model host | proposed |
+| [0009](adr/0009-phone-is-a-camera-not-the-model-host.md) | The phone is a camera, not the model host | proposed — Mac half built (#19) |
 | [0010](adr/0010-read-on-screen-never-aloud.md) | Read on screen, never aloud | proposed |
 | [0011](adr/0011-confidence-from-decoder-disagreement.md) | Confidence from decoder disagreement | proposed |
 | [0012](adr/0012-windowed-decoding-not-true-streaming.md) | Windowed decoding, not true streaming | proposed |
