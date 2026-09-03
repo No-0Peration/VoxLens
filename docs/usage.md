@@ -81,6 +81,7 @@ voxlens clips/*.mp4 --checkpoint "$VOXLENS_CHECKPOINT" --json > transcripts.json
 | `--beam N` | Defaults to `1` (greedy). Higher is more accurate and much slower: beam 40 costs about 16× the compute for ~3 points of accuracy. |
 | `--pre-cropped` | Your video is *already* a mouth crop, so skip face detection. Benchmark corpora ship this way. Without it, VoxLens tries to find a face inside a mouth and produces nonsense. |
 | `--occlusion-min-frames N` | How many consecutive unreadable frames count as an Occlusion. |
+| `--divergence` | Read the clip with the CTC head too, and report how far the two decoders disagree. A measurement, not a confidence — see below. Roughly doubles decode cost. |
 
 ## Exit codes
 
@@ -95,6 +96,42 @@ Useful when scripting over many files:
 
 `1` and `2` are deliberately distinct: one means *your video is bad*, the other means
 *your command is bad*.
+
+## Two decoders, and what their disagreement is worth
+
+The model has two ways to turn the same encoding into words: a beam search, which
+is what you normally get, and the CTC head reading greedily. They routinely
+disagree about the same clip. `--divergence` shows you by how much, and what the
+other one read:
+
+```bash
+voxlens interview.mp4 --checkpoint "$VOXLENS_CHECKPOINT" --divergence
+```
+
+```
+the choices don't make sense because it's the wrong question
+208 frames, 8.3s, RTF 0.51  |  6 occlusion(s), 61 frame(s) with no detected face
+decoders disagree by 0.38 (uncalibrated)  |  the CTC head read: 'the choice is don't make sense because its the wrong question'
+```
+
+The number is word-level edit distance between the two readings over the longer
+of them: `0.0` is word-for-word agreement, `1.0` is nothing in common. Under
+`--json` it arrives as a `divergence` object, and the transcript on stdout is
+untouched either way.
+
+**It is not a confidence score, and it is labelled `calibrated: false` for that
+reason.** The idea that decoders agreeing means the text is right
+([ADR-0011](adr/0011-confidence-from-decoder-disagreement.md)) is plausible and
+unmeasured. Measuring it is one command over a corpus:
+
+```bash
+voxlens-eval "$VOXLENS_CORPUS" --corpus lrs3 --checkpoint "$VOXLENS_CHECKPOINT" --divergence
+```
+
+That adds a `divergence` block to the summary: the rank correlation against
+per-clip WER, and mean WER banded from most agreement to least. Until someone
+runs it, treat the number as what it literally is — two readings differing — and
+not as the model telling you it is unsure.
 
 ## Scoring against a corpus
 

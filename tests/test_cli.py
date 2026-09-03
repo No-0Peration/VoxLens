@@ -291,3 +291,58 @@ def test_several_clips_load_the_checkpoint_once():
     assert len(lines) == 2, "expected one JSON object per Clip"
     for line in lines:
         assert json.loads(line)["transcript"]
+
+
+# --- decoder divergence (#22) ---------------------------------------------
+# Measured, not adopted: whether disagreement predicts being wrong is a
+# correlation over a corpus (voxlens-eval --divergence), and ADR-0011 requires
+# it before this number may be presented as confidence.
+
+@needs_upstream
+@needs_face_clip
+def test_divergence_is_absent_unless_it_is_asked_for():
+    """The default --json shape is what the evaluation harness depends on."""
+    payload = json.loads(run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json").stdout)
+    assert "divergence" not in payload
+
+
+@needs_upstream
+@needs_face_clip
+def test_divergence_reports_the_other_reading_and_claims_nothing():
+    result = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json", "--divergence")
+    assert result.returncode == 0, result.stderr
+    payload = json.loads(result.stdout)
+
+    reported = payload["divergence"]
+    assert 0.0 <= reported["value"] <= 1.0
+    assert isinstance(reported["ctc_transcript"], str)
+    # Per Clip, because the model emits no sentence boundaries at all — see the
+    # amendment on ADR-0011.
+    assert reported["unit"] == "clip"
+    assert reported["calibrated"] is False
+
+
+@needs_upstream
+@needs_face_clip
+def test_the_transcript_on_stdout_is_unchanged_by_divergence():
+    """A second reading is diagnostic. It must not alter what a user gets, and
+    it must not be spliced into the Transcript."""
+    plain = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT)
+    with_flag = run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--divergence")
+
+    assert with_flag.stdout.strip() == plain.stdout.strip()
+    assert "disagree" in with_flag.stderr
+    assert "disagree" not in with_flag.stdout
+
+
+@needs_upstream
+@needs_face_clip
+def test_the_two_decoders_do_read_the_clip_differently():
+    """The premise of ADR-0011, and of ADR-0008 before it. If this ever fails,
+    both ADRs need revisiting rather than the test being relaxed."""
+    payload = json.loads(
+        run_cli(FACE_CLIP, "--checkpoint", CHECKPOINT, "--json", "--divergence").stdout
+    )
+    assert payload["divergence"]["ctc_transcript"] != payload["transcript"] or (
+        payload["divergence"]["value"] == 0.0
+    )

@@ -18,7 +18,7 @@ The second seam exists because Occlusion span logic has real edge cases — runs
 
 ## Amendment: a third seam, for live capture (#19)
 
-Live capture puts a second process on the Mac — `voxlens-serve`, crops in over a socket, Transcripts out — so there are now **three** seams: the CLI, the socket, and the Occlusion span function.
+Live capture puts a second process on the Mac — `voxlens-serve`, crops in over a socket, Transcripts out — so the seams are now: the CLI, the socket, and the pure functions (Occlusion spans, and the divergence and correlation arithmetic added for #22). The principle for the pure ones is the one already stated below: where the edge cases live in the arithmetic, a seam there buys disproportionate coverage for microseconds.
 
 The reason is the one already given here. The server is a process boundary a real client crosses, so its tests cross it too: real framing, real disconnects, real error replies. The recogniser reaches the server as a **callable** rather than being loaded inside it, which is what lets every message on the wire be tested without a 4 GB checkpoint. The claim that actually matters — that the socket is not a second recognition path — is asserted between processes instead: the same pre-cropped Clip goes through `voxlens-serve` and through `voxlens --pre-cropped`, and the text must be identical. That test is checkpoint-gated and skips without one, as the others here do.
 
