@@ -8,7 +8,9 @@ The goal is to explore practical, real-time lip-reading using modern AI and visi
 
 Working, and honest about its limits. `voxlens` turns a video Clip into a Transcript, marks the stretches where the Speaker's mouth could not be read, and `voxlens-eval` scores the whole thing against a corpus.
 
-Measured on an M4 Pro over the full 1,321-clip LRS3 test split: **34.3% WER**, and **47.9%** on a WildVSR sample — roughly every other word wrong on real-world video, which is close to the state of the art for audio-free lip reading. End to end it runs at **RTF 0.29**, about 3.4× faster than real time.
+Measured on an M4 Pro over the full 1,321-clip LRS3 test split: **34.3% WER**, and **50.0%** across the whole 2,854-clip WildVSR test set — exactly every other word wrong on real-world video, which is close to the state of the art for audio-free lip reading. End to end it runs at **RTF 0.29**, about 3.4× faster than real time.
+
+It also knows when to doubt itself: the two decoders' disagreement predicts word error rate at Spearman **0.752**, so a transcript arrives labelled `firm`, `uncertain` or `doubtful` — bands that mean 28.8%, 50.7% and 79.3% measured word errors respectively.
 
 The distribution matters more than the average: **415 of 1,321 clips are read exactly right**, while 193 come out worse than 100% word errors. It tends to nail a Clip or lose it, rather than being uniformly mediocre. See [`docs/demo.html`](docs/demo.html).
 

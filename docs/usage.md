@@ -135,12 +135,13 @@ voxlens-replay mouth.mp4 --stream --occlude-every 25
 An Occlusion cuts the window — there is no signal to read across it — and settles
 everything before it, since no later window will cover that stretch.
 
-## Two decoders, and what their disagreement is worth
+## Two decoders, and how much to trust what they read
 
-The model has two ways to turn the same encoding into words: a beam search, which
-is what you normally get, and the CTC head reading greedily. They routinely
-disagree about the same clip. `--divergence` shows you by how much, and what the
-other one read:
+The model has two ways to turn the same encoding into words: a beam search, which is
+what you normally get, and the CTC head reading greedily. They routinely disagree.
+**How much they disagree predicts how wrong the text is** — measured, not assumed:
+Spearman 0.752 against per-clip WER over the whole 2,854-clip WildVSR test set
+([ADR-0011](adr/0011-confidence-from-decoder-disagreement.md)).
 
 ```bash
 voxlens interview.mp4 --checkpoint "$VOXLENS_CHECKPOINT" --divergence
@@ -149,27 +150,40 @@ voxlens interview.mp4 --checkpoint "$VOXLENS_CHECKPOINT" --divergence
 ```
 the choices don't make sense because it's the wrong question
 208 frames, 8.3s, RTF 0.51  |  6 occlusion(s), 61 frame(s) with no detected face
-decoders disagree by 0.38 (uncalibrated)  |  the CTC head read: 'the choice is don't make sense because its the wrong question'
+reading is FIRM: decoders disagree by 0.18, and Clips in that band average 29% word errors  |  the CTC head read: 'the choices don't make sense because its the wrong question'
 ```
 
-The number is word-level edit distance between the two readings over the longer
-of them: `0.0` is word-for-word agreement, `1.0` is nothing in common. Under
-`--json` it arrives as a `divergence` object, and the transcript on stdout is
+Three bands, and they are tercile boundaries from that measurement rather than
+numbers anybody picked:
+
+| band | divergence | what clips in it actually scored |
+| --- | --- | --- |
+| `firm` | below 0.27 | 28.8% WER |
+| `uncertain` | 0.27 – 0.48 | 50.7% WER |
+| `doubtful` | 0.48 and up | 79.3% WER |
+
+**"Firm" does not mean right.** Clips in that band still average better than one
+word in four wrong, and only one in twenty-eight comes back word-perfect. What it
+does mean is that the two decoders agreed — and 34 of the 36 word-perfect clips in
+the whole corpus are in this band. Where the model is exactly right at all, it is
+right here. The
+number and the band travel together for that reason — a reader told only
+"uncertain" has been given a mood, not a measurement.
+
+Under `--json` it arrives as a `divergence` object with the value, the band, that
+band's measured WER, and the CTC head's own reading. The transcript on stdout is
 untouched either way.
 
-**It is not a confidence score, and it is labelled `calibrated: false` for that
-reason.** The idea that decoders agreeing means the text is right
-([ADR-0011](adr/0011-confidence-from-decoder-disagreement.md)) is plausible and
-unmeasured. Measuring it is one command over a corpus:
+The second decoder is nearly free — RTF 0.097 with both, against 0.097–0.118 for
+beam search alone, because the CTC head is one linear layer and an argmax while
+beam search is hundreds of sequential steps. The flag stays opt-in, but not for
+cost reasons any more.
+
+To re-run the validation, or run it on your own corpus:
 
 ```bash
-voxlens-eval "$VOXLENS_CORPUS" --corpus lrs3 --checkpoint "$VOXLENS_CHECKPOINT" --divergence
+voxlens-eval "$VOXLENS_CORPUS" --corpus wildvsr --checkpoint "$VOXLENS_CHECKPOINT" --divergence
 ```
-
-That adds a `divergence` block to the summary: the rank correlation against
-per-clip WER, and mean WER banded from most agreement to least. Until someone
-runs it, treat the number as what it literally is — two readings differing — and
-not as the model telling you it is unsure.
 
 ## Scoring against a corpus
 
@@ -193,7 +207,7 @@ The harness drives the CLI rather than reaching into Python internals, so the nu
 it reports is what a user of the command actually gets.
 
 **Current baselines**, greedy decoding: **34.3% WER** on the full LRS3 test split,
-**47.9%** on a WildVSR sample. These are regression targets measured against
+**50.0%** across the whole 2,854-clip WildVSR test set. These are regression targets measured against
 themselves — not claims of parity with published research
 ([ADR-0005](adr/0005-two-evaluation-bars.md)).
 

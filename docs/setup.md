@@ -29,7 +29,15 @@ Three fixtures unlock the rest, and only the first needs real speech:
 | `VOXLENS_TEST_CLIP` | any video with a visible, talking face |
 | `VOXLENS_CROP_CLIP` | a clip of **96×96 Mouth Regions**, as corpora ship |
 
-The last one you can make, since corpora are gated or no longer distributed:
+The last one you can make. **One corpus is still obtainable**, though, and it is
+worth having: WildVSR is an 88 MB direct download with no form and no agreement,
+2,854 pre-cropped clips with references —
+[`YasserdahouML/VSR_test_set`](https://github.com/YasserdahouML/VSR_test_set), and
+`docs/research/corpus-availability.md` for why it is the one that survived. Point
+`voxlens-eval --corpus wildvsr` at the directory you unzip it into. LRS3 is gone
+and LRS2 is contractually closed; neither is coming back.
+
+Failing that, a crop clip can be made from nothing:
 
 ```bash
 uv run python scripts/make_crop_clip.py face.mp4 --out mouth96.mp4

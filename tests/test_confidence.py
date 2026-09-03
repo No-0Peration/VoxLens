@@ -166,3 +166,29 @@ def test_the_blank_index_is_where_this_vocabulary_puts_it():
     from utils.utils import UNIGRAM1000_LIST
 
     assert UNIGRAM1000_LIST[CTC_BLANK] == "<blank>"
+
+
+# --- the measured bands (#22) ---------------------------------------------
+# Thresholds are tercile boundaries from 571 WildVSR Clips, not taste. These
+# tests pin the mapping, not the choice of boundary — moving a boundary means
+# re-running the measurement and amending ADR-0011.
+
+def test_divergence_maps_to_the_band_it_was_measured_into():
+    from voxlens.confidence import DOUBTFUL_ABOVE, FIRM_BELOW, band
+
+    assert band(0.0) == "firm"
+    assert band(FIRM_BELOW - 0.001) == "firm"
+    assert band(FIRM_BELOW) == "uncertain"
+    assert band(DOUBTFUL_ABOVE - 0.001) == "uncertain"
+    assert band(DOUBTFUL_ABOVE) == "doubtful"
+    assert band(1.0) == "doubtful"
+
+
+def test_every_band_carries_what_clips_in_it_actually_scored():
+    """A reader told "uncertain" and nothing else has been given a mood."""
+    from voxlens.confidence import BAND_WER_PCT
+
+    assert set(BAND_WER_PCT) == {"firm", "uncertain", "doubtful"}
+    assert BAND_WER_PCT["firm"] < BAND_WER_PCT["uncertain"] < BAND_WER_PCT["doubtful"]
+    # Firm is not right: better than one word in four is still wrong.
+    assert BAND_WER_PCT["firm"] > 20

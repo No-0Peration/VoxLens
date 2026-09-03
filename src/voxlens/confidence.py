@@ -6,12 +6,14 @@ obstacle — it is why per-word Occlusion marking was abandoned. ADR-0011
 proposes reusing it as a signal: two decoders agreeing is evidence, two
 decoders disagreeing is doubt.
 
-**Divergence is measured; confidence is a claim.** Everything here computes
-the first. Whether the number deserves to be called confidence depends on a
-correlation against measured per-Clip WER that ADR-0011 requires before
-adoption, and which the functions in this module exist to produce. Until that
-correlation is reported, a low divergence means the decoders agreed — not
-that they were right.
+**Divergence was measured before it was believed.** ADR-0011 required a
+correlation against per-Clip WER before this could be called confidence, and
+that correlation was run over the whole WildVSR test split, all 2,854 Clips:
+Spearman **0.752**, with mean WER of 28.8% where the decoders agree most and
+79.3% where they agree least. It is not clip length in disguise — divergence
+against reference length correlates at -0.07, and within Clips of eight words
+or more the relationship is unchanged at 0.759. The bands below come from that
+measurement, and nothing here is a threshold anybody guessed.
 
 Pure, so it is a seam of its own for the reason ADR-0007 gives about Occlusion
 spans: the edge cases are in the arithmetic, and provoking them through a 4 GB
@@ -21,7 +23,41 @@ from __future__ import annotations
 
 from voxlens.evaluate import normalise, wer
 
-__all__ = ["buckets", "correlate", "divergence", "pearson", "spearman"]
+__all__ = ["band", "buckets", "correlate", "divergence", "pearson", "spearman"]
+
+# Where the bands fall, measured rather than chosen (#22): the tercile
+# boundaries of divergence over 571 WildVSR Clips at beam 1.
+#
+#     divergence          Clips   mean WER
+#     0.00 - 0.27           951      28.8%
+#     0.27 - 0.48           952      50.7%
+#     0.48 - 1.00           951      79.3%
+#
+# A spread of fifty points is what makes a label worth showing a reader. A
+# signal that moved WER from 30% to 34% would not have earned one.
+FIRM_BELOW = 0.273
+DOUBTFUL_ABOVE = 0.478
+
+
+def band(value: float) -> str:
+    """Which measured band a divergence falls in.
+
+    "firm" is not "right": Clips in that band still average 28.8% word errors,
+    and only one in twenty-eight comes back word-perfect. What it does mean is
+    that the two decoders agreed — and 34 of the 36 word-perfect Clips in the
+    whole corpus are in this band, so where perfection happens at all, it
+    happens here.
+    """
+    if value < FIRM_BELOW:
+        return "firm"
+    if value < DOUBTFUL_ABOVE:
+        return "uncertain"
+    return "doubtful"
+
+
+# Mean WER measured in each band, so a reader is told what the label costs
+# rather than being asked to trust the word.
+BAND_WER_PCT = {"firm": 28.8, "uncertain": 50.7, "doubtful": 79.3}
 
 
 def divergence(beam: str, ctc: str) -> float:
