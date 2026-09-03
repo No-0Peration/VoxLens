@@ -10,6 +10,9 @@
 *.tar.gz
 *.zip
 
+# Swift build products.
+swift/**/.build/
+
 __pycache__/
 *.py[cod]
 .venv/

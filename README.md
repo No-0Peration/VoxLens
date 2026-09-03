@@ -29,6 +29,7 @@ Half built: [live capture](docs/live-capture.md), where a phone is the camera an
 ├── patches/               ← changes to the vendored recogniser
 ├── scripts/vendor.py      ← fetches upstream at a pinned revision, applies patches
 ├── src/voxlens/
+├── swift/                 ← the iOS app's wire protocol, buildable without Xcode
 ├── tests/
 └── docs/
     ├── setup.md           ← install
