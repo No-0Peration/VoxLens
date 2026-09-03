@@ -3,8 +3,8 @@
 Tickets: [#18](https://github.com/No-0Peration/VoxLens/issues/18) measurement · [#19](https://github.com/No-0Peration/VoxLens/issues/19) transport (built) · [#20](https://github.com/No-0Peration/VoxLens/issues/20) iOS app · [#21](https://github.com/No-0Peration/VoxLens/issues/21) windowing · [#22](https://github.com/No-0Peration/VoxLens/issues/22) confidence.
 Decisions: [ADR-0009](adr/0009-phone-is-a-camera-not-the-model-host.md), [ADR-0010](adr/0010-read-on-screen-never-aloud.md), [ADR-0011](adr/0011-confidence-from-decoder-disagreement.md), [ADR-0012](adr/0012-windowed-decoding-not-true-streaming.md).
 
-**Mostly designed, not built.** The transport is built (#19) — see
-[usage](usage.md#live-capture-crops-over-a-socket). Nothing else here exists yet:
+**Partly built.** The transport (#19) and windowed decoding (#21) exist — see
+[usage](usage.md#live-capture-crops-over-a-socket). Nothing else here does:
 no camera feeds it, so the numbers below are still arithmetic rather than
 measurement. This records a design worked out in full before implementation, so
 the reasoning survives even if the work stalls.
@@ -85,6 +85,10 @@ windows process each second three times: inference alone is RTF 0.096, so ×3 is
 comfortably real time, with headroom for network latency.
 
 Two seconds of lag is what live captioning already does and nobody minds.
+
+Built and measured (#21): text reaches the provisional edge **0.3 to 1.3 seconds**
+after it is spoken, and the ×3 overlap costs **≈0.3 RTF**, as predicted. It freezes
+three seconds later rather than two — see the amendments on ADR-0012.
 
 **The last two seconds may be revised; everything before freezes.** Later windows see
 more context and often read an earlier moment better. Rewriting text under a reader's

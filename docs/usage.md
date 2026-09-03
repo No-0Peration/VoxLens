@@ -97,6 +97,44 @@ Useful when scripting over many files:
 `1` and `2` are deliberately distinct: one means *your video is bad*, the other means
 *your command is bad*.
 
+### Reading a Stream, not a Clip
+
+By default a batch of crops is one clip and gets one transcript back. Pass
+`--stream` and the session becomes live instead: the server decodes **three-second
+windows advancing one second at a time**, so text appears while someone is still
+speaking ([ADR-0012](adr/0012-windowed-decoding-not-true-streaming.md)).
+
+```bash
+voxlens-replay mouth.mp4 --stream --realtime
+```
+
+```
+we're not doing that anymore i think it's a good thing to have [a very good]
+we're not doing that anymore i think it's a good thing to have a very good [i'm going to tell you what]
+```
+
+**The brackets are the point.** Text inside them is provisional — the next window
+sees more context and may read it differently. Text outside them has frozen and
+will never change. Live captioning has always worked this way, because text that
+rewrites itself under a reader's eyes is exhausting, and freezing text you could
+immediately improve is wasteful.
+
+Measured on an M4 Pro, 20 seconds pushed at 25 fps: text reaches the provisional
+edge **0.3–1.3 s** after it is spoken, mean decode lag **0.38 s** per window, worst
+**1.44 s** on the first window, which pays for warm-up. The three-times-over
+decoding costs about **0.3 RTF** in total. `--realtime` paces the sending to the
+frame rate, which is the only way the lag figure means anything.
+
+When the camera loses the mouth it says so rather than sending whatever is in
+front of the lens:
+
+```bash
+voxlens-replay mouth.mp4 --stream --occlude-every 25
+```
+
+An Occlusion cuts the window — there is no signal to read across it — and settles
+everything before it, since no later window will cover that stretch.
+
 ## Two decoders, and what their disagreement is worth
 
 The model has two ways to turn the same encoding into words: a beam search, which

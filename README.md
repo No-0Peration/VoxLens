@@ -14,7 +14,7 @@ The distribution matters more than the average: **415 of 1,321 clips are read ex
 
 Not built: real-time streaming (Clips only, per [ADR-0001](docs/adr/0001-clips-first-streaming-target.md)), and filling Occlusions with inferred text — gaps are reported, never invented.
 
-Half built: [live capture](docs/live-capture.md), where a phone is the camera and a Mac runs the recogniser. `voxlens-serve` is the Mac half — the same recogniser behind a socket, taking mouth crops and returning Transcripts — and `voxlens-replay` drives it from a file. The phone does not exist yet, so nothing has yet been read off a live camera.
+Half built: [live capture](docs/live-capture.md), where a phone is the camera and a Mac runs the recogniser. `voxlens-serve` is the Mac half — the same recogniser behind a socket, taking mouth crops and returning Transcripts, either one clip at a time or as a live Stream decoded in overlapping windows with a visible revision boundary. `voxlens-replay` drives it from a file. Measured lag from speech to text on screen is 0.3–1.3s. The phone does not exist yet, so nothing has yet been read off a live camera.
 
 ## Repository layout
 
